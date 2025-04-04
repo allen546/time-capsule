@@ -38,6 +38,10 @@ Time Capsule processes user voice input, sends it to an external API for process
 - `POST /api/conversations` - Start a new conversation
 - `GET /api/conversations` - Get conversation history
 - `POST /api/voice` - Submit voice input and get a response
+- `GET /api/questionnaire` - Get questionnaire questions
+- `POST /api/users/profile/questionnaire` - Submit questionnaire answers
+- `GET /api/users/profile` - Get user profile data
+- `PATCH /api/users/profile` - Update specific profile fields
 
 ## Environment Variables
 
@@ -63,3 +67,17 @@ black .                        # Format code
 ## License
 
 MIT 
+
+## New Features
+
+### Young Self Questionnaire
+
+The system now includes a comprehensive questionnaire for collecting information about the user's life at age 20. This data is used to create a personalized AI simulation for conversations with the user's younger self.
+
+Key features:
+- Structured questionnaire with 12 key areas about the user's life
+- Support for both Chinese and English
+- Multiple ways to submit data (interactive CLI, API, free-text format)
+- Advanced text parsing to extract structured data
+
+For detailed documentation on the questionnaire system, see [QUESTIONNAIRE.md](QUESTIONNAIRE.md). 

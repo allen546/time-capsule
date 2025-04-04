@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时光胶囊 - 与20岁的自己对话</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    
+    <!-- Accessibility Improvements -->
+    <meta name="description" content="时光胶囊让您与20岁的自己对话，重温青春记忆">
+</head>
+<body>
+    <!-- Accessibility Skip Link -->
+    <a href="#main-content" class="skip-link">跳到主要内容</a>
+    
+    <!-- Navbar with large text -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-warning">
+        <div class="container">
+            <a class="navbar-brand fs-2 fw-bold" href="#">
+                <i class="fas fa-hourglass-half me-2" aria-hidden="true"></i>
+                时光胶囊
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link fs-4 active" aria-current="page" href="#"><i class="fas fa-home me-1" aria-hidden="true"></i> 首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link fs-4" href="questionnaire.html"><i class="fas fa-clipboard-list me-1" aria-hidden="true"></i> 问卷调查</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link fs-4" href="conversations.html"><i class="fas fa-comments me-1" aria-hidden="true"></i> 我的对话</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link fs-4" href="profile.html"><i class="fas fa-user me-1" aria-hidden="true"></i> 个人资料</a>
+                    </li>
+                </ul>
+                <div class="ms-3 d-flex">
+                    <button id="loginBtn" class="btn btn-outline-dark fs-5 me-2" data-bs-toggle="modal" data-bs-target="#loginModal">
+                        <i class="fas fa-sign-in-alt me-1" aria-hidden="true"></i> 登录
+                    </button>
+                    <button id="registerBtn" class="btn btn-dark fs-5" data-bs-toggle="modal" data-bs-target="#registerModal">
+                        <i class="fas fa-user-plus me-1" aria-hidden="true"></i> 注册
+                    </button>
+                    <div id="userInfo" class="d-none">
+                        <button class="btn btn-dark fs-5" id="logoutBtn">
+                            <i class="fas fa-sign-out-alt me-1" aria-hidden="true"></i> 退出
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Font Size Controls -->
+    <div class="font-size-controls bg-light py-2 border-bottom">
+        <div class="container d-flex justify-content-end align-items-center">
+            <span class="me-2 fs-5">文字大小:</span>
+            <button id="decreaseFontBtn" class="btn btn-outline-secondary me-1" aria-label="减小文字大小">A-</button>
+            <button id="resetFontBtn" class="btn btn-outline-secondary me-1 active" aria-label="重置文字大小">A</button>
+            <button id="increaseFontBtn" class="btn btn-outline-secondary" aria-label="增大文字大小">A+</button>
+            <span id="currentFontSizeIndicator" class="ms-2 fs-5">正常</span>
+        </div>
+    </div>
+
+    <!-- High Contrast Toggle -->
+    <div class="high-contrast-toggle bg-light py-1">
+        <div class="container d-flex justify-content-end align-items-center">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="highContrastToggle">
+                <label class="form-check-label fs-5" for="highContrastToggle">高对比度模式</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main id="main-content" class="py-5">
+        <!-- Hero Section -->
+        <section class="hero-section bg-warning bg-opacity-50 py-5 mb-5">
+            <div class="container">
+                <div class="row align-items-center">
+                    <div class="col-lg-6">
+                        <h1 class="display-4 fw-bold mb-4">与20岁的自己对话</h1>
+                        <p class="fs-3 mb-4">回到青春时光，重温年轻的梦想与热情。</p>
+                        <p class="fs-4 mb-4">时光胶囊让您能够与20岁的自己进行对话，分享人生经验，寻找遗失的记忆。</p>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                            <button class="btn btn-dark btn-lg px-4 me-md-2 fs-4" id="startChatBtn">
+                                <i class="fas fa-comments me-2" aria-hidden="true"></i>开始对话
+                            </button>
+                            <button class="btn btn-outline-dark btn-lg px-4 fs-4" id="learnMoreBtn">
+                                <i class="fas fa-info-circle me-2" aria-hidden="true"></i>了解更多
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-lg-6 mt-5 mt-lg-0 text-center">
+                        <img src="https://placehold.co/600x400/ffc107/212529?text=时光胶囊" alt="时光胶囊示意图" class="img-fluid rounded shadow-lg" width="500">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section class="how-it-works py-5 mb-5">
+            <div class="container">
+                <h2 class="display-5 fw-bold text-center mb-5">如何使用时光胶囊</h2>
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-warning shadow-sm">
+                            <div class="card-body text-center p-4">
+                                <div class="feature-icon bg-warning bg-opacity-25 d-inline-flex align-items-center justify-content-center fs-2 mb-3 p-3 rounded-circle">
+                                    <i class="fas fa-clipboard-list" aria-hidden="true"></i>
+                                </div>
+                                <h3 class="fs-2 fw-bold mb-3">第一步: 完成问卷</h3>
+                                <p class="fs-4">填写关于您20岁时的详细问卷，包括生活、学习、工作和梦想。</p>
+                                <a href="questionnaire.html" class="btn btn-warning fs-5 mt-3">
+                                    开始填写问卷 <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-warning shadow-sm">
+                            <div class="card-body text-center p-4">
+                                <div class="feature-icon bg-warning bg-opacity-25 d-inline-flex align-items-center justify-content-center fs-2 mb-3 p-3 rounded-circle">
+                                    <i class="fas fa-robot" aria-hidden="true"></i>
+                                </div>
+                                <h3 class="fs-2 fw-bold mb-3">第二步: 系统学习</h3>
+                                <p class="fs-4">我们的AI系统会学习您的经历和性格，创建您20岁时的个性模型。</p>
+                                <button class="btn btn-warning fs-5 mt-3" disabled>
+                                    系统自动处理 <i class="fas fa-cog ms-2" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-warning shadow-sm">
+                            <div class="card-body text-center p-4">
+                                <div class="feature-icon bg-warning bg-opacity-25 d-inline-flex align-items-center justify-content-center fs-2 mb-3 p-3 rounded-circle">
+                                    <i class="fas fa-comments" aria-hidden="true"></i>
+                                </div>
+                                <h3 class="fs-2 fw-bold mb-3">第三步: 开始对话</h3>
+                                <p class="fs-4">与20岁的自己进行文字对话，分享人生经验，重温青春记忆。</p>
+                                <a href="conversations.html" class="btn btn-warning fs-5 mt-3">
+                                    开始对话 <i class="fas fa-comment ms-2" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Testimonials Section -->
+        <section class="testimonials py-5 bg-light">
+            <div class="container">
+                <h2 class="display-5 fw-bold text-center mb-5">用户体验</h2>
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body p-4">
+                                <div class="d-flex align-items-center mb-3">
+                                    <img src="https://placehold.co/100/ffc107/212529?text=张" alt="张先生" class="rounded-circle me-3" width="80" height="80">
+                                    <div>
+                                        <h3 class="fs-3 mb-1">张先生, 65岁</h3>
+                                        <p class="text-muted fs-5">退休教师</p>
+                                    </div>
+                                </div>
+                                <p class="fs-4">"通过时光胶囊，我重新找回了20岁时的热情和梦想。与年轻的自己对话，让我回忆起很多被遗忘的美好回忆，也帮助我重新思考人生的意义。"</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body p-4">
+                                <div class="d-flex align-items-center mb-3">
+                                    <img src="https://placehold.co/100/ffc107/212529?text=李" alt="李女士" class="rounded-circle me-3" width="80" height="80">
+                                    <div>
+                                        <h3 class="fs-3 mb-1">李女士, 70岁</h3>
+                                        <p class="text-muted fs-5">退休医生</p>
+                                    </div>
+                                </div>
+                                <p class="fs-4">"起初我对这个技术有些怀疑，但当我开始与20岁的自己对话，我感到非常震撼。那些年轻时的想法和梦想，与我现在的人生经历形成了有趣的对比。"</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer py-5 bg-dark text-white">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 mb-4 mb-md-0">
+                    <h2 class="fs-3 fw-bold mb-4">时光胶囊</h2>
+                    <p class="fs-5">与20岁的自己对话，重温青春记忆。</p>
+                </div>
+                <div class="col-md-4 mb-4 mb-md-0">
+                    <h3 class="fs-4 mb-3">快速链接</h3>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="#" class="text-white text-decoration-none fs-5">首页</a></li>
+                        <li class="mb-2"><a href="questionnaire.html" class="text-white text-decoration-none fs-5">问卷调查</a></li>
+                        <li class="mb-2"><a href="conversations.html" class="text-white text-decoration-none fs-5">我的对话</a></li>
+                        <li><a href="profile.html" class="text-white text-decoration-none fs-5">个人资料</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h3 class="fs-4 mb-3">联系我们</h3>
+                    <ul class="list-unstyled">
+                        <li class="mb-2 fs-5"><i class="fas fa-envelope me-2" aria-hidden="true"></i> contact@timecapsule.com</li>
+                        <li class="mb-2 fs-5"><i class="fas fa-phone me-2" aria-hidden="true"></i> +86 123 4567 8910</li>
+                    </ul>
+                </div>
+            </div>
+            <hr class="my-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
+                <p class="fs-5 mb-3 mb-md-0">&copy; 2023 时光胶囊. 保留所有权利.</p>
+                <div>
+                    <a href="#" class="text-white me-3 fs-4"><i class="fab fa-weixin" aria-hidden="true"></i><span class="visually-hidden">微信</span></a>
+                    <a href="#" class="text-white me-3 fs-4"><i class="fab fa-weibo" aria-hidden="true"></i><span class="visually-hidden">微博</span></a>
+                    <a href="#" class="text-white fs-4"><i class="fab fa-qq" aria-hidden="true"></i><span class="visually-hidden">QQ</span></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Login Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title fs-3" id="loginModalLabel">登录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="loginUsername" class="form-label fs-4">用户名</label>
+                            <input type="text" class="form-control form-control-lg" id="loginUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="loginPassword" class="form-label fs-4">密码</label>
+                            <input type="password" class="form-control form-control-lg" id="loginPassword" required>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-warning btn-lg fs-4">登录</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div class="modal fade" id="registerModal" tabindex="-1" aria-labelledby="registerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title fs-3" id="registerModalLabel">注册</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="registerForm">
+                        <div class="mb-3">
+                            <label for="registerUsername" class="form-label fs-4">用户名</label>
+                            <input type="text" class="form-control form-control-lg" id="registerUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="registerPassword" class="form-label fs-4">密码</label>
+                            <input type="password" class="form-control form-control-lg" id="registerPassword" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="registerName" class="form-label fs-4">真实姓名</label>
+                            <input type="text" class="form-control form-control-lg" id="registerName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="registerAge" class="form-label fs-4">年龄</label>
+                            <input type="number" class="form-control form-control-lg" id="registerAge" min="1" required>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-warning btn-lg fs-4">注册</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back to Top Button -->
+    <button id="backToTopBtn" class="btn btn-warning btn-lg rounded-circle position-fixed bottom-0 end-0 m-4" aria-label="回到顶部">
+        <i class="fas fa-arrow-up" aria-hidden="true"></i>
+    </button>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+</body>
+</html> 
