@@ -260,47 +260,57 @@ async def session_handler(request, session_id):
 
 @chat_bp.route('/sessions/<session_id>/messages', methods=['GET', 'POST'])
 async def session_messages_handler(request, session_id):
-    """Handle chat messages within a session."""
-    request_id = getattr(request.ctx, 'request_id', str(uuid.uuid4())[:8])
+    """Handle chat messages for a specific session."""
+    request_id = str(uuid.uuid4())[:8]
     
     try:
+        # Get method will return all messages for the session
         if request.method == 'GET':
             chat_logger.info(f"[API:{request_id}] GET /api/chat/sessions/{session_id}/messages request received")
             
-            # Check if user has access to this chat
+            # Get user_uuid from headers
             user_uuid = request.headers.get('x-user-uuid')
+            
             if not user_uuid:
+                chat_logger.error(f"[API:{request_id}] No user_uuid provided in GET request")
                 return json({'error': 'User UUID is required'}, status=400)
             
             async with async_session() as session:
+                # Get chat session info
                 chat = await ChatDB.get_session_by_uuid(session, session_id)
                 
                 if not chat:
+                    chat_logger.warning(f"[API:{request_id}] Chat session {session_id} not found")
                     return json({'error': 'Chat session not found'}, status=404)
                 
-                # Verify ownership (optional, based on your security model)
+                # Check if user has permission to access this chat
                 if chat.user_uuid != user_uuid:
-                    new_session_id = str(uuid.uuid4())
+                    chat_logger.warning(f"[API:{request_id}] Unauthorized access attempt to session {session_id}")
                     return json({
                         'error': 'Session belongs to another user',
-                        'new_session_id': new_session_id
+                        'new_session_id': str(uuid.uuid4())
                     }, status=403)
                 
+                # Get all messages for this session
                 messages = await ChatDB.get_messages_by_session(session, session_id)
                 
-                # Convert to client-friendly format
-                message_dicts = []
+                # Format messages for response - ensure they match client-side expectations
+                formatted_messages = []
                 for msg in messages:
-                    msg_dict = msg.to_dict()
-                    # Adapt to expected frontend format
-                    msg_dict['sender'] = 'user' if msg.is_user else 'ai'
-                    message_dicts.append(msg_dict)
+                    formatted_messages.append({
+                        'id': msg.message_uuid,
+                        'session_id': msg.session_uuid,
+                        'is_user': msg.is_user,
+                        'content': msg.content,  # use 'content' not 'message'
+                        'created_at': msg.created_at.isoformat()
+                    })
                 
+                # Return messages
                 return json({
                     'status': 'success',
-                    'data': message_dicts
+                    'data': formatted_messages
                 })
-                
+        # POST method will add a new message to the session
         elif request.method == 'POST':
             return await add_chat_message(request, session_id)
                 
@@ -385,7 +395,7 @@ async def add_chat_message(request, session_id):
             chat_logger.info(f"[API:{request_id}] Adding user message {user_msg_id[:8]}")
             await ChatDB.add_message(
                 session, 
-                session_id=session_id,
+                session_uuid=session_id,
                 message_uuid=user_msg_id,
                 content=user_message,
                 is_user=True
@@ -409,7 +419,7 @@ async def add_chat_message(request, session_id):
                     chat_logger.info(f"[API:{request_id}] Adding AI message {ai_msg_id[:8]}")
                     await ChatDB.add_message(
                         session, 
-                        session_id=session_id,
+                        session_uuid=session_id,
                         message_uuid=ai_msg_id,
                         content=ai_response,
                         is_user=False
@@ -421,11 +431,13 @@ async def add_chat_message(request, session_id):
                 ai_response = f"Error: {str(e)}"
                 # We don't store error responses in the database
             
-            # Format response
+            # Format response to match expected client format
             response_data = {
-                "message": ai_response,
+                "content": ai_response,  # Change 'message' to 'content' to match client expectation
                 "session_id": session_id,
-                "timestamp": datetime.datetime.utcnow().isoformat()
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "id": ai_msg_id if 'ai_msg_id' in locals() else str(uuid.uuid4()),
+                "is_user": False
             }
             
             chat_logger.info(f"[API:{request_id}] Response generated successfully")

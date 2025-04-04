@@ -99,6 +99,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         indicator.style.display = 'none';
         document.body.appendChild(indicator);
     }
+    
+    // Ensure chat is scrolled to bottom when page loads
+    scrollToBottom();
+    
+    // Add an additional scroll event after all resources are loaded
+    window.addEventListener('load', () => {
+        setTimeout(scrollToBottom, 500);
+    });
 });
 
 /**
@@ -239,6 +247,9 @@ async function loadChatMessages(sessionId) {
         // Clear chat display
         chatMessages.innerHTML = '';
         
+        // Remove loaded class while loading
+        chatMessages.classList.remove('loaded');
+        
         // Show loading indicator
         showLoadingIndicator();
         
@@ -268,15 +279,38 @@ async function loadChatMessages(sessionId) {
         }
         
         const data = await response.json();
-        if (data.status !== 'success') {
-            throw new Error(data.message || 'Unknown error');
+        logInfo(`Chat history response:`, data);
+        
+        if (!data.status || data.status !== 'success') {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            // Try to handle different response formats
+            // Some endpoints might return messages directly without the status wrapper
+            if (!Array.isArray(data)) {
+                // Try to extract messages from data if it's not an array itself
+                if (data.data && Array.isArray(data.data)) {
+                    // Use data.data if it exists and is an array
+                    messages = data.data;
+                } else if (data.messages && Array.isArray(data.messages)) {
+                    // Use data.messages if it exists and is an array
+                    messages = data.messages;
+                } else {
+                    // Default to empty array if we can't find messages
+                    messages = [];
+                }
+            } else {
+                // If data is already an array, use it directly
+                messages = data;
+            }
+        } else {
+            // Standard response format
+            messages = data.data || [];
         }
         
         // Hide empty state when messages are loaded
         emptyChatState.style.display = 'none';
         
-        // Display messages
-        const messages = data.data || [];
         logInfo(`Loaded ${messages.length} messages for session ${sessionId}`);
         
         // No messages, show empty state
@@ -285,9 +319,21 @@ async function loadChatMessages(sessionId) {
         } else {
             // Load existing messages 
             for (const message of messages) {
-                const isUser = message.sender === 'user' || message.is_user;
-                addMessageToChat(message.content, isUser, new Date(message.created_at));
+                // Handle different message formats
+                const isUser = message.sender === 'user' || message.is_user === true;
+                const content = message.content || message.message || '';
+                const timestamp = message.created_at || message.timestamp || new Date().toISOString();
+                
+                // Check if this is a mock or error message
+                const isMock = !isUser && (content.startsWith('Echo:') || content.includes('this is just a mock response'));
+                const isError = !isUser && content.startsWith('Error:');
+                
+                // Add with appropriate styling
+                addMessageToChat(content, isUser, new Date(timestamp), isError, isMock);
             }
+            
+            // Mark chat as loaded to trigger CSS auto-scroll
+            markChatAsLoaded();
             
             // Ensure chat is scrolled to bottom with history
             scrollToBottom();
@@ -430,6 +476,9 @@ function addMessageToChat(message, isUserMessage, timestamp = new Date(), isErro
     // Add to chat
     chatMessages.appendChild(messageContainer);
     
+    // Mark chat as loaded to trigger CSS auto-scroll
+    markChatAsLoaded();
+    
     // Scroll to bottom
     scrollToBottom();
 }
@@ -456,16 +505,61 @@ function formatTime(date) {
 }
 
 /**
- * Scroll chat to bottom
+ * Extremely robust scroll-to-bottom implementation
+ * Makes multiple attempts with different techniques to ensure scrolling works
  */
 function scrollToBottom() {
-    // Use setTimeout to ensure this happens after DOM update
-    setTimeout(() => {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        
-        // For Safari and some mobile browsers that might need extra help
+    // Get the chat messages element
+    const messages = document.getElementById('chatMessages');
+    if (!messages) return;
+    
+    // First immediate scroll attempt with multiple methods
+    if (messages.scrollTo) {
+        messages.scrollTo({ top: messages.scrollHeight, behavior: 'auto' });
+    }
+    messages.scrollTop = messages.scrollHeight;
+    
+    // Force body scroll as well for mobile browsers
+    window.scrollTo(0, document.body.scrollHeight);
+    
+    // Use requestAnimationFrame for a better-timed scroll after layout/paint
+    window.requestAnimationFrame(() => {
+        messages.scrollTop = messages.scrollHeight;
         window.scrollTo(0, document.body.scrollHeight);
-    }, 10);
+    });
+    
+    // Create a series of increasingly delayed scroll attempts to handle dynamic content
+    const scrollAttempts = [10, 100, 300, 500, 1000, 2000];
+    
+    // Apply multiple techniques at each interval
+    scrollAttempts.forEach(delay => {
+        setTimeout(() => {
+            // Standard scroll
+            if (messages) {
+                messages.scrollTop = messages.scrollHeight;
+                
+                // Try smooth scrolling API
+                if (messages.scrollTo) {
+                    messages.scrollTo({
+                        top: messages.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
+                
+                // Force body scroll as well for mobile browsers
+                window.scrollTo({
+                    top: document.body.scrollHeight,
+                    behavior: 'smooth'
+                });
+                
+                // Try scrollIntoView on the last message
+                const lastMessage = messages.lastElementChild;
+                if (lastMessage) {
+                    lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                }
+            }
+        }, delay);
+    });
 }
 
 /**
@@ -788,6 +882,8 @@ async function sendUserMessage(message) {
         }
         
         const data = await response.json();
+        logInfo("API response:", data);
+        
         if (data.status !== 'success') {
             throw new Error(data.message || 'Unknown error');
         }
@@ -797,14 +893,26 @@ async function sendUserMessage(message) {
         
         // Add AI response to chat (user message was already added)
         const aiResponse = data.data.ai_response;
-        const responseText = aiResponse.content || aiResponse.message;
+        // Extract the message from the response, handling different response formats
+        const responseText = aiResponse.message || aiResponse.content || '';
+        
+        logInfo("Processing response text:", responseText);
         
         // Check if this is a mock or error message
         const isMock = responseText.startsWith('Echo:') || responseText.includes('this is just a mock response');
         const isError = responseText.startsWith('Error:');
         
         // Add message to chat with appropriate flags
-        addMessageToChat(responseText, false, new Date(aiResponse.timestamp || aiResponse.created_at), isError, isMock);
+        addMessageToChat(
+            responseText, 
+            false, 
+            new Date(aiResponse.timestamp || aiResponse.created_at), 
+            isError, 
+            isMock
+        );
+        
+        // Ensure we're scrolled to the bottom after response
+        scrollToBottom();
         
         // Hide loading indicator
         hideLoadingIndicator();
@@ -834,5 +942,12 @@ async function sendUserMessage(message) {
         
         showError('无法发送消息，请稍后再试');
         throw error;
+    }
+}
+
+// Function to add a loading class to messages container
+function markChatAsLoaded() {
+    if (chatMessages) {
+        chatMessages.classList.add('loaded');
     }
 } 

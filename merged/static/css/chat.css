@@ -156,4 +156,70 @@
 
 .message.ai-message.mock-message .message-content {
     color: #555599;
+}
+
+/* Improved chat container for better scrolling */
+html, body {
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevents double scrollbars */
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto; /* Allow body to scroll if needed */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    max-height: calc(100vh - 60px); /* Adjust based on header height */
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    scroll-behavior: smooth;
+    overflow-anchor: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch; /* iOS smooth scrolling */
+    max-height: calc(100vh - 200px);
+    contain: content; /* Performance optimization */
+    will-change: scroll-position; /* Performance hint for browsers */
+    transform: translateZ(0); /* Force GPU acceleration */
+    padding-bottom: 30px; /* Extra padding at bottom for better visibility */
+}
+
+/* Ensure scrolling works on iOS */
+@supports (-webkit-touch-callout: none) {
+    .chat-messages {
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Add scroll anchoring for browsers that support it */
+.chat-messages {
+    overflow-anchor: auto;
+}
+
+/* Override any potential conflicts */
+.chat-messages * {
+    overflow-anchor: none;
+}
+
+/* Enhanced auto-scroll animation */
+@keyframes autoScroll {
+    to { transform: translateY(100%); }
+}
+
+.chat-messages.loaded:not(:empty) {
+    animation: autoScroll 0.01s;
+    animation-fill-mode: forwards;
 } 

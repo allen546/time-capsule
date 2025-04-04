@@ -685,8 +685,7 @@
          * 滚动到底部
          */
         function scrollToBottom() {
-            const chatMessages = document.getElementById('chat-messages');
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            window.scrollTo(0, document.body.scrollHeight);
         }
         
         // 语音识别相关函数
@@ -813,6 +812,124 @@
         
         // 页面加载时应用保存的设置
         window.addEventListener('load', loadSettings);
+        
+        // Single robust scroll handler
+        (function() {
+            // Initialize on load
+            document.addEventListener('DOMContentLoaded', initScrollHandlers);
+            window.addEventListener('load', initScrollHandlers);
+            
+            function initScrollHandlers() {
+                // Immediate scroll
+                if (typeof scrollToBottom === 'function') {
+                    scrollToBottom();
+                } else {
+                    fallbackScroll();
+                }
+                
+                // Set up delayed attempts to ensure scroll works with dynamic content
+                const delays = [100, 300, 500, 1000, 2000, 3000];
+                delays.forEach(delay => {
+                    setTimeout(() => {
+                        if (typeof scrollToBottom === 'function') {
+                            scrollToBottom();
+                        } else {
+                            fallbackScroll();
+                        }
+                    }, delay);
+                });
+                
+                // Set up mutation observer for dynamic content
+                setupMutationObserver();
+                
+                // Add image load handlers
+                setupImageLoadHandlers();
+            }
+            
+            // Fallback scroll if main function not available
+            function fallbackScroll() {
+                const chatMessages = document.getElementById('chat-messages');
+                if (chatMessages) {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    
+                    const lastMessage = chatMessages.lastElementChild;
+                    if (lastMessage) {
+                        lastMessage.scrollIntoView({behavior: 'smooth', block: 'end'});
+                    }
+                    
+                    window.scrollTo({
+                        top: document.body.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+            
+            // Set up mutation observer to detect new messages/content
+            function setupMutationObserver() {
+                const chatContainer = document.getElementById('chat-messages');
+                if (!chatContainer) return;
+                
+                const observer = new MutationObserver(mutations => {
+                    let shouldScroll = false;
+                    
+                    mutations.forEach(mutation => {
+                        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                            shouldScroll = true;
+                            
+                            // Add image load handlers to any new images
+                            mutation.addedNodes.forEach(node => {
+                                if (node.querySelectorAll) {
+                                    const images = node.querySelectorAll('img');
+                                    images.forEach(img => {
+                                        if (!img.dataset.scrollHandlerAdded) {
+                                            img.dataset.scrollHandlerAdded = 'true';
+                                            img.addEventListener('load', () => {
+                                                if (typeof scrollToBottom === 'function') {
+                                                    scrollToBottom();
+                                                } else {
+                                                    fallbackScroll();
+                                                }
+                                            });
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+                    
+                    if (shouldScroll) {
+                        if (typeof scrollToBottom === 'function') {
+                            scrollToBottom();
+                        } else {
+                            fallbackScroll();
+                        }
+                    }
+                });
+                
+                observer.observe(chatContainer, { 
+                    childList: true, 
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['src']
+                });
+            }
+            
+            // Add handlers to existing images
+            function setupImageLoadHandlers() {
+                document.querySelectorAll('.message img').forEach(img => {
+                    if (!img.dataset.scrollHandlerAdded) {
+                        img.dataset.scrollHandlerAdded = 'true';
+                        img.addEventListener('load', () => {
+                            if (typeof scrollToBottom === 'function') {
+                                scrollToBottom();
+                            } else {
+                                fallbackScroll();
+                            }
+                        });
+                    }
+                });
+            }
+        })();
     </script>
 </body>
 </html> 
