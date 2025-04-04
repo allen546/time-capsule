@@ -3,246 +3,696 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日记 - 时光胶囊</title>
-    
-    <!-- Prevent caching in development -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Font Awesome icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/styles.css">
-    
-    <!-- Accessibility meta tags -->
-    <meta name="description" content="记录您的日记和回忆 - 时光胶囊">
+    <title>时间胶囊 - 每日心情</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #FF7043;
+            --secondary-color: #FFA726;
+            --background-color: #FFF8E1;
+            --card-color: #FFFFFF;
+            --text-color: #3E2723;
+            --text-secondary: #8D6E63;
+            --border-radius: 18px;
+            --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+            --font-size-base: 16px;
+            --font-size-large: 18px;
+            --font-size-xlarge: 20px;
+            --font-size-xxlarge: 24px;
+            --font-size-xxxlarge: 28px;
+        }
+        
+        /* 高对比度模式 */
+        :root[data-theme="high-contrast"] {
+            --primary-color: #FF0000;
+            --secondary-color: #FFFF00;
+            --background-color: #000000;
+            --card-color: #000000;
+            --text-color: #FFFFFF;
+            --text-secondary: #FFFF00;
+            --shadow: 0 8px 30px rgba(255, 255, 255, 0.2);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Icons', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+            font-size: var(--font-size-base);
+        }
+        
+        .header {
+            background-color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .back-button {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: background-color 0.2s ease;
+        }
+        
+        .back-button:hover {
+            background-color: rgba(255, 112, 67, 0.1);
+        }
+        
+        .back-icon {
+            margin-right: 6px;
+            font-size: var(--font-size-large);
+        }
+        
+        .header-title {
+            flex-grow: 1;
+            text-align: center;
+            font-size: var(--font-size-large);
+            font-weight: 600;
+            margin: 0 40px;
+        }
+        
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .section-title {
+            font-size: var(--font-size-xxxlarge);
+            font-weight: 700;
+            margin: 30px 0 20px;
+            color: var(--text-color);
+        }
+        
+        .today-card {
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid var(--text-secondary);
+        }
+        
+        .today-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .today-date {
+            font-size: var(--font-size-large);
+            color: var(--text-color);
+            font-weight: 600;
+        }
+        
+        .mood-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .mood-button {
+            background: none;
+            border: 2px solid var(--text-secondary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: var(--font-size-xxlarge);
+            transition: all 0.2s ease;
+        }
+        
+        .mood-button:hover {
+            transform: scale(1.1);
+            border-color: var(--primary-color);
+        }
+        
+        .mood-button.selected {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        
+        .activity-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--text-secondary);
+            border-radius: var(--border-radius);
+            font-size: var(--font-size-base);
+            margin-bottom: 20px;
+            background-color: var(--card-color);
+            color: var(--text-color);
+        }
+        
+        .activity-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        .save-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 12px 24px;
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        
+        .save-button:hover {
+            background-color: #F4511E;
+            transform: scale(1.02);
+        }
+        
+        .save-button:active {
+            transform: scale(0.98);
+        }
+        
+        .diary-list {
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            margin-bottom: 30px;
+            border: 1px solid var(--text-secondary);
+        }
+        
+        .diary-item {
+            padding: 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .diary-item:last-child {
+            border-bottom: none;
+        }
+        
+        .diary-item:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+        
+        .diary-date {
+            color: var(--text-secondary);
+            font-size: var(--font-size-base);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .date-icon {
+            margin-right: 6px;
+            font-size: var(--font-size-base);
+        }
+        
+        .diary-content {
+            font-size: var(--font-size-base);
+            color: var(--text-color);
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+        
+        .diary-meta {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-top: 8px;
+        }
+        
+        .diary-mood {
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: var(--font-size-base);
+        }
+        
+        .mood-icon {
+            margin-right: 4px;
+            font-size: var(--font-size-base);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        .empty-title {
+            font-size: var(--font-size-xlarge);
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-color);
+        }
+        
+        .empty-description {
+            font-size: var(--font-size-base);
+            margin-bottom: 20px;
+            color: var(--text-secondary);
+        }
+        
+        /* 辅助功能控制面板 */
+        .accessibility-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+            border: 1px solid var(--text-secondary);
+        }
+        
+        .accessibility-title {
+            font-size: var(--font-size-large);
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--text-color);
+        }
+        
+        .accessibility-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .control-label {
+            font-size: var(--font-size-base);
+            color: var(--text-color);
+            min-width: 80px;
+        }
+        
+        .font-size-controls {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .font-size-button {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            border: 1px solid var(--text-secondary);
+            border-radius: 4px;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .font-size-button:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .contrast-toggle {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            border: 1px solid var(--text-secondary);
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        
+        .contrast-toggle:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .contrast-toggle.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .section-title {
+                font-size: calc(var(--font-size-xxxlarge) * 0.85);
+                margin: 20px 0 15px;
+            }
+            
+            .diary-item {
+                padding: 15px;
+            }
+            
+            .accessibility-panel {
+                bottom: 10px;
+                right: 10px;
+                padding: 10px;
+            }
+            
+            .mood-button {
+                width: 40px;
+                height: 40px;
+                font-size: var(--font-size-large);
+            }
+        }
+    </style>
 </head>
 <body>
-    <!-- Accessibility skip link -->
-    <a href="#main-content" class="skip-link">跳到主要内容</a>
+    <div class="header">
+        <button class="back-button" id="back-button">
+            <span class="back-icon">←</span>返回
+        </button>
+        <div class="header-title">每日心情</div>
+    </div>
     
-    <!-- Header with accessibility controls -->
-    <header>
-        <div class="accessibility-bar">
-            <div class="container d-flex justify-content-end">
-                <div class="font-controls">
-                    <span class="me-2">文字大小:</span>
-                    <button id="decreaseFontBtn" class="btn-font" aria-label="减小文字大小">A-</button>
-                    <button id="normalFontBtn" class="btn-font active" aria-label="文字大小级别">3</button>
-                    <button id="increaseFontBtn" class="btn-font" aria-label="增大文字大小">A+</button>
-                </div>
-                <div class="contrast-toggle ms-4">
-                    <label for="highContrastToggle" class="form-check-label me-2">高对比度:</label>
-                    <input type="checkbox" id="highContrastToggle" class="form-check-input">
-                </div>
+    <div class="container">
+        <div class="today-card">
+            <div class="today-header">
+                <div class="today-date" id="today-date"></div>
             </div>
+            
+            <div class="mood-selector">
+                <button class="mood-button" data-mood="happy">😊</button>
+                <button class="mood-button" data-mood="excited">🤗</button>
+                <button class="mood-button" data-mood="calm">😌</button>
+                <button class="mood-button" data-mood="sad">😢</button>
+                <button class="mood-button" data-mood="angry">😠</button>
+            </div>
+            
+            <textarea class="activity-input" id="activity-input" placeholder="今天发生了什么有趣的事情呢？" rows="3"></textarea>
+            
+            <button class="save-button" id="save-button">
+                <span class="button-icon">💾</span>保存今天的心情
+            </button>
         </div>
         
-        <!-- Main navigation -->
-        <nav class="navbar navbar-expand-lg">
-            <div class="container">
-                <a class="navbar-brand" href="/">
-                    <i class="fas fa-hourglass-half me-2"></i>
-                    <span class="brand-text">时光胶囊</span>
-                </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" 
-                        aria-controls="mainNav" aria-expanded="false" aria-label="切换导航">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <div class="collapse navbar-collapse" id="mainNav">
-                    <ul class="navbar-nav ms-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" href="/"><i class="fas fa-home me-1"></i> 首页</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link active" href="/diary"><i class="fas fa-book me-1"></i> 日记</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/chat"><i class="fas fa-comments me-1"></i> 我的对话</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/profile"><i class="fas fa-user me-1"></i> 个人资料</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </header>
-
-    <!-- Main content -->
-    <main id="main-content" class="py-5">
-        <div class="container">
-            <div class="row justify-content-center">
-                <div class="col-lg-10">
-                    <!-- Success Alert -->
-                    <div id="diarySuccessAlert" class="alert alert-success alert-dismissible fade show d-none" role="alert">
-                        <i class="fas fa-check-circle me-2"></i> <span id="successAlertMessage">操作成功！</span>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>
-                    </div>
-                    
-                    <div class="diary-header mb-4">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h1 class="diary-title"><i class="fas fa-book me-2"></i> 我的日记</h1>
-                            <a href="/create-entry" id="newDiaryBtn" class="btn btn-primary">
-                                <i class="fas fa-plus me-2"></i> 新建日记
-                            </a>
-                        </div>
-                        <p class="text-muted">在这里记录您的想法、回忆和生活点滴</p>
-                    </div>
-                    
-                    <!-- Empty state (shown when no entries exist) -->
-                    <div id="emptyDiaryState" class="text-center py-5 my-4 bg-light rounded">
-                        <div class="py-4">
-                            <i class="fas fa-book-open fa-4x text-muted mb-3"></i>
-                            <h3>还没有日记</h3>
-                            <p class="text-muted">点击"新建日记"按钮开始记录您的想法和回忆</p>
-                            <a href="/create-entry" id="emptyStateNewBtn" class="btn btn-primary mt-3">
-                                <i class="fas fa-plus me-2"></i> 创建第一篇日记
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Diary entries list -->
-                    <div id="diaryEntriesList" class="d-none">
-                        <!-- Entries will be dynamically inserted here -->
-                    </div>
-                    
-                    <!-- Pagination controls (if needed) -->
-                    <nav aria-label="日记分页" class="mt-4 d-none" id="diaryPagination">
-                        <ul class="pagination justify-content-center">
-                            <li class="page-item disabled">
-                                <a class="page-link" href="#" tabindex="-1" aria-disabled="true">上一页</a>
-                            </li>
-                            <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                            <li class="page-item"><a class="page-link" href="#">2</a></li>
-                            <li class="page-item"><a class="page-link" href="#">3</a></li>
-                            <li class="page-item">
-                                <a class="page-link" href="#">下一页</a>
-                            </li>
-                        </ul>
-                    </nav>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-4 mb-4 mb-md-0">
-                    <h2 class="footer-title">时光胶囊</h2>
-                    <p class="footer-text">与20岁的自己对话，重温青春记忆。</p>
-                </div>
-                <div class="col-md-4 mb-4 mb-md-0">
-                    <h3 class="footer-subtitle">快速链接</h3>
-                    <ul class="footer-links">
-                        <li><a href="/">首页</a></li>
-                        <li><a href="/diary">日记</a></li>
-                        <li><a href="/chat">我的对话</a></li>
-                        <li><a href="/profile">个人资料</a></li>
-                    </ul>
-                </div>
-                <div class="col-md-4">
-                    <h3 class="footer-subtitle">联系我们</h3>
-                    <ul class="footer-contact">
-                        <li><i class="fas fa-envelope me-2"></i> contact@timecapsule.com</li>
-                        <li><i class="fas fa-phone me-2"></i> +86 123 4567 8910</li>
-                    </ul>
-                </div>
-            </div>
-            <hr>
-            <div class="footer-bottom">
-                <p class="copyright">&copy; 2023 时光胶囊. 保留所有权利.</p>
-                <div class="social-icons">
-                    <a href="#" aria-label="微信"><i class="fab fa-weixin"></i></a>
-                    <a href="#" aria-label="微博"><i class="fab fa-weibo"></i></a>
-                    <a href="#" aria-label="QQ"><i class="fab fa-qq"></i></a>
-                </div>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Back to top button -->
-    <button id="backToTopBtn" aria-label="返回顶部">
-        <i class="fas fa-arrow-up"></i>
-    </button>
-
-    <!-- Delete Confirmation Modal -->
-    <div class="modal fade" id="deleteDiaryModal" tabindex="-1" aria-labelledby="deleteDiaryModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title" id="deleteDiaryModalLabel">
-                        <i class="fas fa-trash-alt me-2"></i> 删除日记
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
-                </div>
-                <div class="modal-body">
-                    <p>您确定要删除这篇日记吗？此操作不可撤销。</p>
-                    <div class="alert alert-warning">
-                        <strong>将要删除:</strong> <span id="deleteDiaryTitle">日记标题</span>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" id="confirmDeleteDiaryBtn" class="btn btn-danger">确认删除</button>
-                </div>
+        <h2 class="section-title">历史记录</h2>
+        
+        <div class="diary-list" id="diary-list">
+            <!-- 这里将通过JavaScript动态加载日记列表 -->
+            <div class="empty-state">
+                <div class="empty-icon">📝</div>
+                <div class="empty-title">暂无记录</div>
+                <div class="empty-description">开始记录你的每一天。</div>
             </div>
         </div>
     </div>
-
-    <!-- Bootstrap JS with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- User Session System (must be loaded first) -->
-    <script src="/static/js/userSession.js"></script>
+    <!-- 辅助功能控制面板 -->
+    <div class="accessibility-panel">
+        <div class="accessibility-title">辅助功能</div>
+        <div class="accessibility-controls">
+            <div class="control-group">
+                <div class="control-label">字体大小</div>
+                <div class="font-size-controls">
+                    <button class="font-size-button" id="decrease-font">A-</button>
+                    <button class="font-size-button" id="reset-font">A</button>
+                    <button class="font-size-button" id="increase-font">A+</button>
+                </div>
+            </div>
+            <div class="control-group">
+                <div class="control-label">高对比度</div>
+                <button class="contrast-toggle" id="contrast-toggle">开启</button>
+            </div>
+        </div>
+    </div>
     
-    <!-- Custom JavaScript -->
-    <script src="/static/js/main.js"></script>
-    
-    <!-- Diary Page Script (must be loaded after userSession.js) -->
-    <script src="/static/js/diary.js"></script>
-    
-    <!-- Error logging script -->
     <script>
-        window.addEventListener('error', function(e) {
-            console.error('Global error caught:', e.error);
+        // 设置今天的日期
+        const today = new Date();
+        const formattedDate = today.toLocaleDateString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+        document.getElementById('today-date').textContent = formattedDate;
+        
+        // 返回按钮
+        document.getElementById('back-button').addEventListener('click', function() {
+            window.location.href = '/';
         });
         
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Diary page loaded successfully');
-            
-            // Test button functionality
-            const newDiaryBtn = document.getElementById('newDiaryBtn');
-            const emptyStateNewBtn = document.getElementById('emptyStateNewBtn');
-            
-            if (newDiaryBtn) {
-                console.log('New Diary button found in DOM');
-                newDiaryBtn.addEventListener('click', function() {
-                    console.log('New Diary button clicked directly from inline script');
-                });
-            } else {
-                console.error('New Diary button NOT found in DOM from inline script');
+        // 心情选择
+        let selectedMood = null;
+        const moodButtons = document.querySelectorAll('.mood-button');
+        
+        moodButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // 移除其他按钮的选中状态
+                moodButtons.forEach(btn => btn.classList.remove('selected'));
+                // 添加当前按钮的选中状态
+                this.classList.add('selected');
+                selectedMood = this.dataset.mood;
+            });
+        });
+        
+        // 保存按钮
+        document.getElementById('save-button').addEventListener('click', async function() {
+            if (!selectedMood) {
+                alert('请选择一个心情');
+                return;
             }
             
-            if (emptyStateNewBtn) {
-                console.log('Empty State New button found in DOM');
-                emptyStateNewBtn.addEventListener('click', function() {
-                    console.log('Empty State New button clicked directly from inline script');
+            const content = document.getElementById('activity-input').value.trim();
+            if (!content) {
+                alert('请记录一下今天发生的事情');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/diary/entries', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-UUID': localStorage.getItem('user_uuid') || 'test-user'
+                    },
+                    body: JSON.stringify({
+                        title: `${formattedDate}的心情`,
+                        content: content,
+                        date: today.toISOString().split('T')[0],
+                        mood: selectedMood
+                    })
                 });
-            } else {
-                console.error('Empty State New button NOT found in DOM from inline script');
+                
+                if (!response.ok) {
+                    throw new Error('Failed to save diary entry');
+                }
+                
+                // 清空输入
+                document.getElementById('activity-input').value = '';
+                moodButtons.forEach(btn => btn.classList.remove('selected'));
+                selectedMood = null;
+                
+                // 重新加载日记列表
+                loadDiaryEntries();
+                
+                alert('保存成功！');
+            } catch (error) {
+                console.error('Error saving diary entry:', error);
+                alert('保存失败，请稍后再试');
             }
         });
+        
+        // 字体大小调整功能
+        const root = document.documentElement;
+        let currentFontSize = 1; // 1 = 100%
+        
+        document.getElementById('increase-font').addEventListener('click', function() {
+            if (currentFontSize < 1.5) {
+                currentFontSize += 0.1;
+                updateFontSize();
+                saveSettings();
+            }
+        });
+        
+        document.getElementById('decrease-font').addEventListener('click', function() {
+            if (currentFontSize > 0.8) {
+                currentFontSize -= 0.1;
+                updateFontSize();
+                saveSettings();
+            }
+        });
+        
+        document.getElementById('reset-font').addEventListener('click', function() {
+            currentFontSize = 1;
+            updateFontSize();
+            saveSettings();
+        });
+        
+        function updateFontSize() {
+            root.style.setProperty('--font-size-base', `${16 * currentFontSize}px`);
+            root.style.setProperty('--font-size-large', `${18 * currentFontSize}px`);
+            root.style.setProperty('--font-size-xlarge', `${20 * currentFontSize}px`);
+            root.style.setProperty('--font-size-xxlarge', `${24 * currentFontSize}px`);
+            root.style.setProperty('--font-size-xxxlarge', `${28 * currentFontSize}px`);
+        }
+        
+        // 高对比度模式
+        const contrastToggle = document.getElementById('contrast-toggle');
+        let highContrast = false;
+        
+        contrastToggle.addEventListener('click', function() {
+            highContrast = !highContrast;
+            if (highContrast) {
+                root.setAttribute('data-theme', 'high-contrast');
+                contrastToggle.textContent = '关闭';
+                contrastToggle.classList.add('active');
+            } else {
+                root.removeAttribute('data-theme');
+                contrastToggle.textContent = '开启';
+                contrastToggle.classList.remove('active');
+            }
+            saveSettings();
+        });
+        
+        // 保存设置到本地存储
+        function saveSettings() {
+            localStorage.setItem('timeCapsuleFontSize', currentFontSize);
+            localStorage.setItem('timeCapsuleHighContrast', highContrast);
+        }
+        
+        // 加载保存的设置
+        function loadSettings() {
+            const savedFontSize = localStorage.getItem('timeCapsuleFontSize');
+            const savedHighContrast = localStorage.getItem('timeCapsuleHighContrast');
+            
+            if (savedFontSize) {
+                currentFontSize = parseFloat(savedFontSize);
+                updateFontSize();
+            }
+            
+            if (savedHighContrast === 'true') {
+                highContrast = true;
+                root.setAttribute('data-theme', 'high-contrast');
+                contrastToggle.textContent = '关闭';
+                contrastToggle.classList.add('active');
+            }
+        }
+        
+        // 页面加载时应用保存的设置
+        window.addEventListener('load', loadSettings);
+        
+        // 加载日记列表
+        async function loadDiaryEntries() {
+            try {
+                const response = await fetch('/api/diary/entries', {
+                    headers: {
+                        'X-User-UUID': localStorage.getItem('user_uuid') || 'test-user'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch diary entries');
+                }
+                
+                const data = await response.json();
+                const diaryList = document.getElementById('diary-list');
+                
+                if (!data.data || data.data.length === 0) {
+                    // 如果没有日记，显示空状态
+                    return;
+                }
+                
+                // 清空空状态
+                diaryList.innerHTML = '';
+                
+                // 添加日记项
+                data.data.forEach(entry => {
+                    const diaryItem = document.createElement('div');
+                    diaryItem.className = 'diary-item';
+                    
+                    // 格式化日期
+                    const date = new Date(entry.date);
+                    const formattedDate = date.toLocaleDateString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                    });
+                    
+                    // 获取心情图标
+                    const moodIcons = {
+                        'happy': '😊',
+                        'sad': '😢',
+                        'angry': '😠',
+                        'calm': '😌',
+                        'excited': '🤗'
+                    };
+                    const moodIcon = moodIcons[entry.mood] || moodIcons.calm;
+                    
+                    diaryItem.innerHTML = `
+                        <div class="diary-date">
+                            <span class="date-icon">📅</span>${formattedDate}
+                        </div>
+                        <div class="diary-content">${entry.content}</div>
+                        <div class="diary-meta">
+                            <div class="diary-mood">
+                                <span class="mood-icon">${moodIcon}</span>${entry.mood || '平静'}
+                            </div>
+                        </div>
+                    `;
+                    
+                    diaryList.appendChild(diaryItem);
+                });
+            } catch (error) {
+                console.error('Error loading diary entries:', error);
+                const diaryList = document.getElementById('diary-list');
+                diaryList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">⚠️</div>
+                        <div class="empty-title">加载失败</div>
+                        <div class="empty-description">无法加载日记列表，请稍后再试。</div>
+                    </div>
+                `;
+            }
+        }
+        
+        // 页面加载时加载日记列表
+        window.addEventListener('load', loadDiaryEntries);
     </script>
 </body>
 </html> 

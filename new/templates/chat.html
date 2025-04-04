@@ -3,500 +3,681 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>聊天 - 时光胶囊</title>
-    
-    <!-- Prevent caching in development -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Font Awesome icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/styles.css">
-    <link rel="stylesheet" href="/static/css/chat.css">
-    
-    <!-- Chat-specific CSS -->
+    <title>时间胶囊 - 对话</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="preload" href="/api/chat" as="fetch" crossorigin="anonymous">
     <style>
-        .chat-container {
-            background-color: var(--color-bg-alt);
-            border-radius: 20px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            margin-bottom: 40px;
+        :root {
+            --primary-color: #FF7043;
+            --secondary-color: #FFA726;
+            --background-color: #FFF8E1;
+            --card-color: #FFFFFF;
+            --text-color: #3E2723;
+            --text-secondary: #8D6E63;
+            --border-radius: 18px;
+            --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+            --user-message-bg: #FF7043;
+            --ai-message-bg: #FFF3E0;
+            --font-size-base: 16px;
+            --font-size-large: 18px;
+            --font-size-xlarge: 20px;
+            --font-size-xxlarge: 24px;
         }
         
-        .chat-sidebar {
-            background-color: var(--color-bg-card);
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            height: 600px;
-            overflow-y: auto;
+        /* 高对比度模式 */
+        :root[data-theme="high-contrast"] {
+            --primary-color: #FF0000;
+            --secondary-color: #FFFF00;
+            --background-color: #000000;
+            --card-color: #000000;
+            --text-color: #FFFFFF;
+            --text-secondary: #FFFF00;
+            --shadow: 0 8px 30px rgba(255, 255, 255, 0.2);
+            --user-message-bg: #FF0000;
+            --ai-message-bg: #000000;
         }
         
-        .chat-session {
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            background-color: rgba(249, 168, 38, 0.1);
-            transition: all 0.2s ease;
-            font-size: 18px;
-            border-left: 5px solid transparent;
-            cursor: pointer;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         
-        .chat-session:hover, .chat-session.active {
-            background-color: rgba(249, 168, 38, 0.2);
-            border-left-color: var(--color-primary);
-        }
-        
-        .chat-title {
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        
-        .chat-date {
-            font-size: 14px;
-            color: var(--color-text-muted);
-        }
-        
-        .chat-main {
-            background-color: var(--color-bg-card);
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            height: 650px;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Icons', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            max-width: 1200px;
-            margin: 0 auto;
+            font-size: var(--font-size-base);
         }
         
-        .chat-header {
-            border-bottom: 1px solid var(--color-border);
-            padding-bottom: 15px;
-            margin-bottom: 15px;
+        .header {
+            background-color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .back-button {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: background-color 0.2s ease;
+        }
+        
+        .back-button:hover {
+            background-color: rgba(255, 112, 67, 0.1);
+        }
+        
+        .back-icon {
+            margin-right: 6px;
+            font-size: var(--font-size-large);
+        }
+        
+        .header-title {
+            flex-grow: 1;
+            text-align: center;
+            font-size: var(--font-size-large);
+            font-weight: 600;
+            margin: 0 40px;
+        }
+        
+        .chat-container {
+            flex-grow: 1;
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
         }
         
         .chat-messages {
             flex-grow: 1;
             overflow-y: auto;
-            padding-right: 10px;
+            padding: 20px;
             margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
         
         .message {
-            max-width: 75%;
-            margin-bottom: 20px;
-            padding: 15px;
-            border-radius: 15px;
-            font-size: 18px;
-            line-height: 1.5;
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: var(--font-size-base);
+            line-height: 1.4;
             position: relative;
+            animation: fadeIn 0.3s ease;
         }
         
-        .message-user {
-            background-color: var(--color-primary-light);
-            color: var(--color-text);
-            margin-left: auto;
-            border-bottom-right-radius: 5px;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        .message-ai {
-            background-color: var(--color-bg-alt);
-            color: var(--color-text);
-            margin-right: auto;
-            border-bottom-left-radius: 5px;
+        .user-message {
+            background-color: var(--user-message-bg);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
         }
         
-        .chat-input-container {
-            position: relative;
-            border-top: 1px solid var(--color-border);
-            padding-top: 20px;
+        .ai-message {
+            background-color: var(--ai-message-bg);
+            color: var(--text-color);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
         }
         
-        .chat-input {
-            background-color: var(--color-bg);
-            border: 2px solid var(--color-border);
-            border-radius: 20px;
-            font-size: 18px;
-            padding: 15px 140px 15px 25px;
-            transition: all 0.3s ease;
-            min-height: 80px;
-        }
-        
-        .chat-input:focus {
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(249, 168, 38, 0.2);
-        }
-        
-        .chat-controls {
-            margin-top: 15px;
+        .input-container {
             display: flex;
-            justify-content: space-between;
+            gap: 12px;
+            padding: 16px;
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-top: auto;
         }
         
-        .control-btn {
-            background-color: var(--color-bg-alt);
-            border: 2px solid var(--color-border);
-            color: var(--color-text);
-            border-radius: 50px;
-            padding: 12px 18px;
-            font-size: 18px;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .text-input {
+            flex-grow: 1;
+            padding: 12px 16px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            font-size: var(--font-size-base);
+            outline: none;
+            transition: border-color 0.2s ease;
         }
         
-        .control-btn:hover, .control-btn.active {
-            background-color: var(--color-primary-light);
-            border-color: var(--color-primary);
-        }
-        
-        .control-btn i {
-            font-size: 20px;
+        .text-input:focus {
+            border-color: var(--primary-color);
         }
         
         .voice-btn {
-            position: absolute;
-            right: 75px;
-            bottom: 15px;
-            background-color: var(--color-primary);
+            background-color: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            border-radius: 12px;
+            padding: 12px 20px;
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s ease;
-        }
-        
-        .voice-btn:hover {
-            background-color: var(--color-primary-dark);
-            transform: scale(1.05);
-        }
-        
-        .voice-btn i {
-            font-size: 24px;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
         }
         
         .voice-btn.recording {
-            animation: pulse 1.5s infinite;
             background-color: #f44336;
+            animation: pulse 1.5s infinite;
         }
         
         @keyframes pulse {
             0% {
-                box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7);
+                box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4);
             }
             70% {
-                box-shadow: 0 0 0 15px rgba(244, 67, 54, 0);
+                box-shadow: 0 0 0 10px rgba(244, 67, 54, 0);
             }
             100% {
                 box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
             }
         }
         
-        .send-btn {
-            position: absolute;
-            right: 15px;
-            bottom: 15px;
-            background-color: var(--color-primary);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
+        .send-icon {
+            font-size: var(--font-size-large);
+        }
+        
+        .typing-indicator {
             display: flex;
             align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
+            gap: 4px;
+            padding: 12px 16px;
+            background-color: var(--ai-message-bg);
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            align-self: flex-start;
+            margin-top: 8px;
+            animation: fadeIn 0.3s ease;
         }
         
-        .send-btn:hover {
-            background-color: var(--color-primary-dark);
-            transform: scale(1.05);
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--text-secondary);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
         }
         
-        .send-btn i {
-            font-size: 20px;
+        .typing-dot:nth-child(1) {
+            animation-delay: 0s;
         }
         
-        .send-btn:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-            transform: none;
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
         }
         
-        .empty-state {
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-6px); }
+        }
+        
+        /* 辅助功能控制面板 */
+        .accessibility-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 15px;
             display: flex;
             flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+            border: 1px solid var(--text-secondary);
+        }
+        
+        .accessibility-title {
+            font-size: var(--font-size-large);
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--text-color);
+        }
+        
+        .accessibility-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .control-label {
+            font-size: var(--font-size-base);
+            color: var(--text-color);
+            min-width: 80px;
+        }
+        
+        .font-size-controls {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .font-size-button {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            border: 1px solid var(--text-secondary);
+            border-radius: 4px;
+            width: 30px;
+            height: 30px;
+            display: flex;
             align-items: center;
             justify-content: center;
-            height: 100%;
-            color: var(--color-text-muted);
-            text-align: center;
-            padding: 20px;
+            cursor: pointer;
+            font-weight: bold;
         }
         
-        .empty-state i {
-            font-size: 60px;
-            margin-bottom: 20px;
-            color: var(--color-primary-light);
-        }
-        
-        .message-time {
-            font-size: 12px;
-            color: var(--color-text-muted);
-            margin-top: 5px;
-            text-align: right;
-        }
-        
-        /* High contrast adjustments */
-        .high-contrast .chat-container {
-            background-color: #000000;
-            border: 2px solid var(--color-secondary);
-        }
-        
-        .high-contrast .chat-sidebar,
-        .high-contrast .chat-main {
-            background-color: #000000;
-            border: 2px solid var(--color-secondary);
-        }
-        
-        .high-contrast .chat-session {
-            background-color: #1a1a1a;
-            border-left-color: var(--color-secondary);
-        }
-        
-        .high-contrast .chat-session:hover,
-        .high-contrast .chat-session.active {
-            background-color: #333333;
-            border-left-color: var(--color-secondary);
-        }
-        
-        .high-contrast .message-user {
-            background-color: #333333;
-            color: white;
-            border: 2px solid var(--color-secondary);
-        }
-        
-        .high-contrast .message-ai {
-            background-color: #1a1a1a;
-            color: white;
-            border: 2px solid var(--color-text);
-        }
-        
-        .high-contrast .control-btn {
-            background-color: #000000;
-            border: 2px solid white;
+        .font-size-button:hover {
+            background-color: var(--primary-color);
             color: white;
         }
         
-        .high-contrast .control-btn:hover,
-        .high-contrast .control-btn.active {
-            background-color: var(--color-secondary);
-            color: black;
+        .contrast-toggle {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            border: 1px solid var(--text-secondary);
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
         }
         
-        .high-contrast .chat-input {
-            background-color: #000000;
+        .contrast-toggle:hover {
+            background-color: var(--primary-color);
             color: white;
-            border: 2px solid white;
         }
         
-        .high-contrast .chat-input:focus {
-            border-color: var(--color-secondary);
+        .contrast-toggle.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        @media (max-width: 768px) {
+            .chat-container {
+                padding: 10px;
+            }
+            
+            .message {
+                max-width: 90%;
+            }
+            
+            .accessibility-panel {
+                bottom: 10px;
+                right: 10px;
+                padding: 10px;
+            }
         }
     </style>
-    
-    <!-- Accessibility meta tags -->
-    <meta name="description" content="时光胶囊的聊天页面，通过语音或文字与20岁的自己交流">
 </head>
 <body>
-    <!-- Accessibility skip link -->
-    <a href="#main-content" class="skip-link">跳到主要内容</a>
+    <div class="header">
+        <button class="back-button" id="back-button">
+            <span class="back-icon">←</span>返回
+        </button>
+        <div class="header-title">与AI对话</div>
+    </div>
     
-    <!-- Header with accessibility controls -->
-    <header>
-        <div class="accessibility-bar">
-            <div class="container d-flex justify-content-end">
-                <div class="font-controls">
-                    <span class="me-2">文字大小:</span>
-                    <button id="decreaseFontBtn" class="btn-font" aria-label="减小文字大小">A-</button>
-                    <button id="normalFontBtn" class="btn-font active" aria-label="文字大小级别">3</button>
-                    <button id="increaseFontBtn" class="btn-font" aria-label="增大文字大小">A+</button>
-                </div>
-                <div class="contrast-toggle ms-4">
-                    <label for="highContrastToggle" class="form-check-label me-2">高对比度:</label>
-                    <input type="checkbox" id="highContrastToggle" class="form-check-input">
-                </div>
+    <div class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+            <div class="message ai-message">
+                你好！我是你的AI助手。请告诉我你想聊些什么？
             </div>
         </div>
         
-        <!-- Main navigation -->
-        <nav class="navbar navbar-expand-lg">
-            <div class="container">
-                <a class="navbar-brand" href="/">
-                    <i class="fas fa-hourglass-half me-2"></i>
-                    <span class="brand-text">时光胶囊</span>
-                </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" 
-                        aria-controls="mainNav" aria-expanded="false" aria-label="切换导航">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <div class="collapse navbar-collapse" id="mainNav">
-                    <ul class="navbar-nav ms-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" href="/"><i class="fas fa-home me-1"></i> 首页</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/diary"><i class="fas fa-book me-1"></i> 日记</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link active" href="/chat"><i class="fas fa-comments me-1"></i> 我的对话</a>
-                        </li>
-                        <li class="nav-item" id="profileNavItem" style="display:none">
-                            <a class="nav-link" href="/profile">
-                                <i class="fas fa-user me-1"></i> <span id="navUserName">个人资料</span>
-                            </a>
-                        </li>
-                    </ul>
-                    <div class="ms-lg-4 mt-3 mt-lg-0" id="authButtons">
-                        <a href="/profile" class="btn btn-auth btn-login me-2">
-                            <i class="fas fa-user-plus me-1"></i> 个人资料
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </nav>
-    </header>
-
-    <!-- Main content -->
-    <main id="main-content">
-        <div class="container py-5">
-            <div class="diary-header mb-4">
-                <h1 class="diary-title"><i class="fas fa-comments me-2"></i>与20岁的自己对话</h1>
-                <p class="lead text-muted">在这里，您可以与20岁的自己进行交流，分享人生经验和回忆</p>
-            </div>
-            
-            <div class="chat-container">
-                <div class="row">
-                    <!-- Main chat area -->
-                    <div class="col-12">
-                        <div class="chat-main">
-                            <!-- Chat header -->
-                            <div class="chat-header">
-                                <h2 id="currentChatTitle" class="h4 mb-0">与20岁的自己对话</h2>
-                            </div>
-                            
-                            <!-- Chat messages area -->
-                            <div class="chat-messages" id="chatMessages">
-                                <!-- Messages will be loaded here dynamically -->
-                                
-                                <!-- Empty state - shown when no chat is selected -->
-                                <div id="emptyChatState" class="empty-state">
-                                    <i class="fas fa-comment-dots"></i>
-                                    <h3>开始对话</h3>
-                                    <p>发送一条消息开始与20岁的自己交流</p>
-                                </div>
-                            </div>
-                            
-                            <!-- Recording status indicator -->
-                            <div id="recordingStatus" class="recording-status">
-                                <div class="recording-dot"></div>
-                                <span id="recordingTime">00:00</span>
-                            </div>
-                            
-                            <!-- Chat input area -->
-                            <div class="chat-input-container">
-                                <textarea id="chatInput" class="chat-input form-control" placeholder="输入您的消息..." rows="3"></textarea>
-                                <button id="voiceInputBtn" class="voice-btn" title="语音输入">
-                                    <i class="fas fa-microphone"></i>
-                                </button>
-                                <button id="sendMessageBtn" class="send-btn" title="发送消息">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="input-container">
+            <input type="text" class="text-input" id="message-input" placeholder="输入消息...">
+            <button class="voice-btn" id="voiceBtn">
+                <i class="fas fa-microphone"></i>
+            </button>
         </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-4 mb-4 mb-md-0">
-                    <h2 class="footer-title">时光胶囊</h2>
-                    <p class="footer-text">与20岁的自己对话，重温青春记忆。</p>
-                </div>
-                <div class="col-md-4 mb-4 mb-md-0">
-                    <h3 class="footer-subtitle">快速链接</h3>
-                    <ul class="footer-links">
-                        <li><a href="/">首页</a></li>
-                        <li><a href="/diary">日记</a></li>
-                        <li><a href="/chat">我的对话</a></li>
-                        <li><a href="/profile">个人资料</a></li>
-                    </ul>
-                </div>
-                <div class="col-md-4">
-                    <h3 class="footer-subtitle">联系我们</h3>
-                    <ul class="footer-contact">
-                        <li><i class="fas fa-envelope me-2"></i> contact@timecapsule.com</li>
-                        <li><i class="fas fa-phone me-2"></i> +86 123 4567 8910</li>
-                    </ul>
-                </div>
-            </div>
-            <hr>
-            <div class="footer-bottom">
-                <p class="copyright">&copy; 2023 时光胶囊. 保留所有权利.</p>
-                <div class="social-icons">
-                    <a href="#" aria-label="微信"><i class="fab fa-weixin"></i></a>
-                    <a href="#" aria-label="微博"><i class="fab fa-weibo"></i></a>
-                    <a href="#" aria-label="QQ"><i class="fab fa-qq"></i></a>
-                </div>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Back to top button -->
-    <button id="backToTopBtn" aria-label="返回顶部">
-        <i class="fas fa-arrow-up"></i>
-    </button>
-
-    <!-- Loading indicator -->
-    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
-        <div class="spinner"></div>
-        <div class="loading-text">思考中...</div>
     </div>
-
-    <!-- Error message display -->
-    <div id="errorMessage" class="error-message"></div>
-
-    <!-- Bootstrap 5 JS Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- User Session System - Must be loaded first -->
-    <script src="/static/js/userSession.js"></script>
+    <!-- 辅助功能控制面板 -->
+    <div class="accessibility-panel">
+        <div class="accessibility-title">辅助功能</div>
+        <div class="accessibility-controls">
+            <div class="control-group">
+                <div class="control-label">字体大小</div>
+                <div class="font-size-controls">
+                    <button class="font-size-button" id="decrease-font">A-</button>
+                    <button class="font-size-button" id="reset-font">A</button>
+                    <button class="font-size-button" id="increase-font">A+</button>
+                </div>
+            </div>
+            <div class="control-group">
+                <div class="control-label">高对比度</div>
+                <button class="contrast-toggle" id="contrast-toggle">开启</button>
+            </div>
+        </div>
+    </div>
     
-    <!-- Chat specific JavaScript -->
-    <script src="/static/js/chat.js"></script>
-    
-    <!-- Custom JavaScript -->
-    <script src="/static/js/main.js"></script>
+    <script>
+        // 立即显示聊天界面，不等待DOM完全加载
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化聊天界面
+            initChat();
+        });
+        
+        function initChat() {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageInput = document.getElementById('message-input');
+            const voiceBtn = document.getElementById('voiceBtn');
+            const backButton = document.getElementById('back-button');
+            
+            // 返回按钮
+            backButton.addEventListener('click', function() {
+                window.location.href = '/';
+            });
+            
+            // 发送消息
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // 语音按钮
+            voiceBtn.addEventListener('mousedown', function() {
+                startRecording();
+            });
+            
+            voiceBtn.addEventListener('mouseup', function() {
+                stopRecording();
+            });
+            
+            voiceBtn.addEventListener('mouseleave', function() {
+                stopRecording();
+            });
+            
+            // 加载聊天历史
+            loadChatHistory();
+        }
+        
+        // 发送消息
+        async function sendMessage() {
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+            
+            // 清空输入框
+            messageInput.value = '';
+            
+            // 添加用户消息到聊天界面
+            addMessage(message, 'user');
+            
+            // 显示正在输入指示器
+            const typingIndicator = document.createElement('div');
+            typingIndicator.className = 'typing-indicator';
+            typingIndicator.innerHTML = `
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            `;
+            
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.appendChild(typingIndicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            try {
+                // 发送消息到服务器
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        message: message,
+                        chat_id: getChatId() // 获取当前聊天ID
+                    }),
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to send message');
+                }
+                
+                const data = await response.json();
+                
+                // 移除正在输入指示器
+                typingIndicator.remove();
+                
+                // 添加AI回复到聊天界面
+                addMessage(data.response, 'ai');
+                
+                // 如果是新对话，更新URL中的聊天ID
+                if (data.chat_id && !getChatId()) {
+                    updateChatId(data.chat_id);
+                }
+            } catch (error) {
+                // 移除正在输入指示器
+                typingIndicator.remove();
+                
+                console.error('Error:', error);
+                addMessage('抱歉，发生了错误，请稍后再试。', 'ai');
+            }
+        }
+        
+        // 获取当前聊天ID
+        function getChatId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('id');
+        }
+        
+        // 更新URL中的聊天ID
+        function updateChatId(chatId) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('id', chatId);
+            window.history.replaceState({}, '', url);
+        }
+        
+        // 加载聊天历史
+        async function loadChatHistory() {
+            const chatId = getChatId();
+            if (!chatId) return;
+            
+            try {
+                const response = await fetch(`/api/chat/${chatId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load chat history');
+                }
+                
+                const data = await response.json();
+                const chatMessages = document.getElementById('chat-messages');
+                
+                // 清空现有消息
+                chatMessages.innerHTML = '';
+                
+                // 添加历史消息
+                data.messages.forEach(msg => {
+                    addMessage(msg.content, msg.sender);
+                });
+                
+                // 滚动到底部
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } catch (error) {
+                console.error('Error loading chat history:', error);
+                addMessage('无法加载聊天历史，请刷新页面重试。', 'ai');
+            }
+        }
+        
+        // 添加消息到聊天界面
+        function addMessage(text, sender) {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            
+            // 滚动到底部
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // 语音识别相关函数
+        let recognition = null;
+        let isRecording = false;
+        
+        function startRecording() {
+            if (!('webkitSpeechRecognition' in window)) {
+                alert('您的浏览器不支持语音识别功能，请使用Chrome浏览器。');
+                return;
+            }
+            
+            if (!recognition) {
+                recognition = new webkitSpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'zh-CN';
+                
+                recognition.onresult = function(event) {
+                    const text = event.results[0][0].transcript;
+                    document.getElementById('message-input').value = text;
+                    sendMessage();
+                };
+                
+                recognition.onerror = function(event) {
+                    console.error('Speech recognition error:', event.error);
+                    isRecording = false;
+                    voiceBtn.classList.remove('recording');
+                };
+                
+                recognition.onend = function() {
+                    isRecording = false;
+                    voiceBtn.classList.remove('recording');
+                };
+            }
+            
+            recognition.start();
+            isRecording = true;
+            voiceBtn.classList.add('recording');
+        }
+        
+        function stopRecording() {
+            if (recognition && isRecording) {
+                recognition.stop();
+                isRecording = false;
+                voiceBtn.classList.remove('recording');
+            }
+        }
+        
+        // 字体大小调整功能
+        const root = document.documentElement;
+        let currentFontSize = 1; // 1 = 100%
+        
+        document.getElementById('increase-font').addEventListener('click', function() {
+            if (currentFontSize < 1.5) {
+                currentFontSize += 0.1;
+                updateFontSize();
+                saveSettings();
+            }
+        });
+        
+        document.getElementById('decrease-font').addEventListener('click', function() {
+            if (currentFontSize > 0.8) {
+                currentFontSize -= 0.1;
+                updateFontSize();
+                saveSettings();
+            }
+        });
+        
+        document.getElementById('reset-font').addEventListener('click', function() {
+            currentFontSize = 1;
+            updateFontSize();
+            saveSettings();
+        });
+        
+        function updateFontSize() {
+            root.style.setProperty('--font-size-base', `${16 * currentFontSize}px`);
+            root.style.setProperty('--font-size-large', `${18 * currentFontSize}px`);
+            root.style.setProperty('--font-size-xlarge', `${20 * currentFontSize}px`);
+            root.style.setProperty('--font-size-xxlarge', `${24 * currentFontSize}px`);
+        }
+        
+        // 高对比度模式
+        const contrastToggle = document.getElementById('contrast-toggle');
+        let highContrast = false;
+        
+        contrastToggle.addEventListener('click', function() {
+            highContrast = !highContrast;
+            if (highContrast) {
+                root.setAttribute('data-theme', 'high-contrast');
+                contrastToggle.textContent = '关闭';
+                contrastToggle.classList.add('active');
+            } else {
+                root.removeAttribute('data-theme');
+                contrastToggle.textContent = '开启';
+                contrastToggle.classList.remove('active');
+            }
+            saveSettings();
+        });
+        
+        // 保存设置到本地存储
+        function saveSettings() {
+            localStorage.setItem('timeCapsuleFontSize', currentFontSize);
+            localStorage.setItem('timeCapsuleHighContrast', highContrast);
+        }
+        
+        // 加载保存的设置
+        function loadSettings() {
+            const savedFontSize = localStorage.getItem('timeCapsuleFontSize');
+            const savedHighContrast = localStorage.getItem('timeCapsuleHighContrast');
+            
+            if (savedFontSize) {
+                currentFontSize = parseFloat(savedFontSize);
+                updateFontSize();
+            }
+            
+            if (savedHighContrast === 'true') {
+                highContrast = true;
+                root.setAttribute('data-theme', 'high-contrast');
+                contrastToggle.textContent = '关闭';
+                contrastToggle.classList.add('active');
+            }
+        }
+        
+        // 页面加载时应用保存的设置
+        window.addEventListener('load', loadSettings);
+    </script>
 </body>
 </html> 

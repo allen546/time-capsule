@@ -16,7 +16,7 @@ echo "Running migrations..."
 python migrate_data.py
 
 # Start the application
-echo "Starting Time Capsule application..."
+echo "Starting Time Capsule application on port 8000..."
 python app.py
 
 # Deactivate virtual environment when done
