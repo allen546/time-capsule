@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日记 - 时光胶囊</title>
+    <title>创建日记 - 时光胶囊</title>
     
     <!-- Prevent caching in development -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="/static/css/styles.css">
     
     <!-- Accessibility meta tags -->
-    <meta name="description" content="记录您的日记和回忆 - 时光胶囊">
+    <meta name="description" content="创建新的日记 - 时光胶囊">
 </head>
 <body>
     <!-- Accessibility skip link -->
@@ -81,54 +81,63 @@
     <main id="main-content" class="py-5">
         <div class="container">
             <div class="row justify-content-center">
-                <div class="col-lg-10">
+                <div class="col-lg-8">
                     <!-- Success Alert -->
-                    <div id="diarySuccessAlert" class="alert alert-success alert-dismissible fade show d-none" role="alert">
-                        <i class="fas fa-check-circle me-2"></i> <span id="successAlertMessage">操作成功！</span>
+                    <div id="entrySuccessAlert" class="alert alert-success alert-dismissible fade show d-none" role="alert">
+                        <i class="fas fa-check-circle me-2"></i> <span id="successAlertMessage">日记已保存！</span>
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>
                     </div>
                     
-                    <div class="diary-header mb-4">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h1 class="diary-title"><i class="fas fa-book me-2"></i> 我的日记</h1>
-                            <a href="/create-entry" id="newDiaryBtn" class="btn btn-primary">
-                                <i class="fas fa-plus me-2"></i> 新建日记
-                            </a>
+                    <div class="card shadow">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h1 class="h3 mb-0"><i class="fas fa-edit me-2"></i> 创建新日记</h1>
+                                <a href="/diary" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-arrow-left me-1"></i> 返回日记列表
+                                </a>
+                            </div>
                         </div>
-                        <p class="text-muted">在这里记录您的想法、回忆和生活点滴</p>
-                    </div>
-                    
-                    <!-- Empty state (shown when no entries exist) -->
-                    <div id="emptyDiaryState" class="text-center py-5 my-4 bg-light rounded">
-                        <div class="py-4">
-                            <i class="fas fa-book-open fa-4x text-muted mb-3"></i>
-                            <h3>还没有日记</h3>
-                            <p class="text-muted">点击"新建日记"按钮开始记录您的想法和回忆</p>
-                            <a href="/create-entry" id="emptyStateNewBtn" class="btn btn-primary mt-3">
-                                <i class="fas fa-plus me-2"></i> 创建第一篇日记
-                            </a>
+                        <div class="card-body">
+                            <form id="createEntryForm">
+                                <input type="hidden" id="diaryEntryId">
+                                <div class="mb-3">
+                                    <label for="diaryTitle" class="form-label">标题</label>
+                                    <input type="text" class="form-control form-control-lg" id="diaryTitle" placeholder="请输入日记标题" autofocus>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="diaryDate" class="form-label">日期</label>
+                                    <input type="date" class="form-control form-control-lg" id="diaryDate">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="diaryContent" class="form-label">内容</label>
+                                    <textarea class="form-control" id="diaryContent" rows="15" placeholder="请输入日记内容..."></textarea>
+                                    <small class="text-muted">在这里记录您的感想、回忆和生活点滴。</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="diaryMood" class="form-label">心情</label>
+                                    <select class="form-select form-select-lg" id="diaryMood">
+                                        <option value="happy">开心 😊</option>
+                                        <option value="calm" selected>平静 😌</option>
+                                        <option value="sad">难过 😢</option>
+                                        <option value="excited">兴奋 🤩</option>
+                                        <option value="angry">生气 😠</option>
+                                        <option value="tired">疲惫 😫</option>
+                                        <option value="nostalgic">怀旧 🥹</option>
+                                    </select>
+                                </div>
+                                <div class="mb-4 form-check">
+                                    <input type="checkbox" class="form-check-input" id="diaryPin">
+                                    <label class="form-check-label" for="diaryPin">置顶此日记</label>
+                                </div>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <a href="/diary" class="btn btn-outline-secondary">取消</a>
+                                    <button type="button" id="saveEntryBtn" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i> 保存日记
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                    
-                    <!-- Diary entries list -->
-                    <div id="diaryEntriesList" class="d-none">
-                        <!-- Entries will be dynamically inserted here -->
-                    </div>
-                    
-                    <!-- Pagination controls (if needed) -->
-                    <nav aria-label="日记分页" class="mt-4 d-none" id="diaryPagination">
-                        <ul class="pagination justify-content-center">
-                            <li class="page-item disabled">
-                                <a class="page-link" href="#" tabindex="-1" aria-disabled="true">上一页</a>
-                            </li>
-                            <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                            <li class="page-item"><a class="page-link" href="#">2</a></li>
-                            <li class="page-item"><a class="page-link" href="#">3</a></li>
-                            <li class="page-item">
-                                <a class="page-link" href="#">下一页</a>
-                            </li>
-                        </ul>
-                    </nav>
                 </div>
             </div>
         </div>
@@ -176,29 +185,47 @@
         <i class="fas fa-arrow-up"></i>
     </button>
 
-    <!-- Delete Confirmation Modal -->
-    <div class="modal fade" id="deleteDiaryModal" tabindex="-1" aria-labelledby="deleteDiaryModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title" id="deleteDiaryModalLabel">
-                        <i class="fas fa-trash-alt me-2"></i> 删除日记
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
-                </div>
-                <div class="modal-body">
-                    <p>您确定要删除这篇日记吗？此操作不可撤销。</p>
-                    <div class="alert alert-warning">
-                        <strong>将要删除:</strong> <span id="deleteDiaryTitle">日记标题</span>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" id="confirmDeleteDiaryBtn" class="btn btn-danger">确认删除</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Add debug script before loading other scripts -->
+    <script>
+        console.log('Debug script loaded in create_entry.html');
+        
+        // Define a global saveEntry function that will be replaced by the actual one
+        function saveEntry() {
+            console.log('Global saveEntry function called');
+            
+            // Get form values directly
+            const title = document.getElementById('diaryTitle').value.trim();
+            const date = document.getElementById('diaryDate').value;
+            const content = document.getElementById('diaryContent').value.trim();
+            const mood = document.getElementById('diaryMood') ? document.getElementById('diaryMood').value : 'calm';
+            const pinned = document.getElementById('diaryPin') ? document.getElementById('diaryPin').checked : false;
+            
+            if (!title) {
+                alert('请输入日记标题');
+                return;
+            }
+            
+            if (!date) {
+                alert('请选择日期');
+                return;
+            }
+            
+            if (!content) {
+                alert('请输入日记内容');
+                return;
+            }
+            
+            console.log('Manual save - redirecting to diary page');
+            alert('日记已保存');
+            window.location.href = '/diary';
+        }
+        
+        // Track script loading
+        window.loadedScripts = [];
+        window.addEventListener('error', function(e) {
+            console.error('Global error in create_entry.html:', e.error);
+        });
+    </script>
 
     <!-- Bootstrap JS with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -206,43 +233,13 @@
     <!-- User Session System (must be loaded first) -->
     <script src="/static/js/userSession.js"></script>
     
+    <!-- Diary API (needs to be loaded before createEntry.js) -->
+    <script src="/static/js/diary.js"></script>
+    
     <!-- Custom JavaScript -->
     <script src="/static/js/main.js"></script>
     
-    <!-- Diary Page Script (must be loaded after userSession.js) -->
-    <script src="/static/js/diary.js"></script>
-    
-    <!-- Error logging script -->
-    <script>
-        window.addEventListener('error', function(e) {
-            console.error('Global error caught:', e.error);
-        });
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Diary page loaded successfully');
-            
-            // Test button functionality
-            const newDiaryBtn = document.getElementById('newDiaryBtn');
-            const emptyStateNewBtn = document.getElementById('emptyStateNewBtn');
-            
-            if (newDiaryBtn) {
-                console.log('New Diary button found in DOM');
-                newDiaryBtn.addEventListener('click', function() {
-                    console.log('New Diary button clicked directly from inline script');
-                });
-            } else {
-                console.error('New Diary button NOT found in DOM from inline script');
-            }
-            
-            if (emptyStateNewBtn) {
-                console.log('Empty State New button found in DOM');
-                emptyStateNewBtn.addEventListener('click', function() {
-                    console.log('Empty State New button clicked directly from inline script');
-                });
-            } else {
-                console.error('Empty State New button NOT found in DOM from inline script');
-            }
-        });
-    </script>
+    <!-- Create Entry Script -->
+    <script src="/static/js/createEntry.js"></script>
 </body>
 </html> 

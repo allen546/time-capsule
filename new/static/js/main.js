@@ -270,4 +270,111 @@ function initHelpButtons() {
             window.UserSession.showWelcomeModal();
         });
     }
-} 
+}
+
+/**
+ * Initialize profile form with auto-save functionality
+ * Adds event listeners for form fields to auto-save when user types
+ */
+document.addEventListener('DOMContentLoaded', async function() {
+    const profileForm = document.getElementById('profileForm');
+    if (!profileForm || !window.UserSession) return;
+    
+    // Regular form submission handler
+    profileForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        try {
+            // Get form data
+            const name = document.getElementById('userName').value.trim();
+            const age = parseInt(document.getElementById('userAge').value, 10) || '';
+            
+            // Validate
+            if (!name) {
+                alert('请输入您的姓名');
+                return;
+            }
+            
+            // Update profile
+            await window.UserSession.updateUserProfile(name, age);
+            
+            // Show success message
+            alert('资料已保存');
+            
+            // Hide modal if on home page
+            const profileModal = bootstrap.Modal.getInstance(document.getElementById('profileModal'));
+            if (profileModal) profileModal.hide();
+        } catch (error) {
+            console.error('Error saving profile:', error);
+            alert('保存失败，请稍后再试。');
+        }
+    });
+    
+    // Debounce function to prevent too many save requests
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // Auto-save function
+    const autoSaveProfile = debounce(async function() {
+        try {
+            // Get form data
+            const name = document.getElementById('userName').value.trim();
+            const age = parseInt(document.getElementById('userAge').value, 10) || '';
+            
+            // Don't save if name is empty
+            if (!name) {
+                console.log('Not auto-saving: name is empty');
+                return;
+            }
+            
+            // Update profile
+            await window.UserSession.updateUserProfile(name, age);
+            console.log('Profile auto-saved successfully');
+            
+            // Show subtle indicator that save happened
+            const saveBtn = profileForm.querySelector('button[type="submit"]');
+            if (saveBtn) {
+                const originalText = saveBtn.textContent;
+                saveBtn.textContent = '已自动保存';
+                setTimeout(() => {
+                    saveBtn.textContent = originalText;
+                }, 1000);
+            }
+        } catch (error) {
+            console.error('Error auto-saving profile:', error);
+            // Silently fail on auto-save errors
+        }
+    }, 2000); // Wait 2 seconds after last input before saving
+    
+    // Add auto-save to each input
+    const nameInput = document.getElementById('userName');
+    const ageInput = document.getElementById('userAge');
+    
+    if (nameInput) {
+        nameInput.addEventListener('input', autoSaveProfile);
+    }
+    
+    if (ageInput) {
+        ageInput.addEventListener('input', autoSaveProfile);
+    }
+    
+    // Load user data
+    try {
+        const userData = await window.UserSession.getSessionData();
+        if (userData && nameInput && ageInput) {
+            nameInput.value = userData.name || '';
+            ageInput.value = userData.age || '';
+        }
+    } catch (error) {
+        console.error('Error loading user data:', error);
+    }
+}); 

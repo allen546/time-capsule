@@ -12,8 +12,15 @@ import json
 import datetime
 from sanic import Sanic
 from sanic.response import html, json as json_response, file, redirect, text
+from sanic.log import logger
 import aiofiles
 from functools import wraps
+
+# Import database module
+from db import init_db, get_session, DiaryDB, UserDB, async_session
+
+# Import profile questions
+from data.user_profile_questions import USER_PROFILE_QUESTIONS
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +51,17 @@ if not os.path.exists(users_file):
     with open(users_file, 'w') as f:
         json.dump({}, f)
 
+# Configure session middleware
+@app.middleware('request')
+async def inject_session(request):
+    request.ctx.session = async_session()
+
+@app.middleware('response')
+async def close_session(request, response):
+    if hasattr(request.ctx, 'session'):
+        await request.ctx.session.close()
+    return response
+
 # Disable caching for static files in development
 @app.middleware('response')
 async def add_no_cache_headers(request, response):
@@ -55,6 +73,23 @@ async def add_no_cache_headers(request, response):
 
 # Configure static serving
 app.static('/static', static_folder)
+
+# Event listeners for database initialization
+@app.listener('before_server_start')
+async def setup_db(app, loop):
+    """Initialize database before server starts."""
+    logger.info("Starting database initialization...")
+    try:
+        await init_db()
+        logger.info("Database initialized successfully")
+        
+        # Log database location to help with debugging
+        db_path = os.path.join(data_folder, 'timecapsule.db')
+        logger.info(f"Database location: {db_path}")
+        logger.info(f"Database exists: {os.path.exists(db_path)}")
+    except Exception as e:
+        logger.error(f"Error initializing database: {str(e)}", exc_info=True)
+        raise
 
 # Routes
 @app.route('/')
@@ -81,13 +116,30 @@ async def diary(request):
         content = await f.read()
     return html(content)
 
+@app.route('/create-entry', methods=['GET'])
+async def create_entry(request):
+    """Serve the create entry page."""
+    try:
+        logger.info("Serving create entry page")
+        template_path = os.path.join(templates_folder, 'create_entry.html')
+        if not os.path.exists(template_path):
+            logger.error(f"Template file not found: {template_path}")
+            return html("<h1>Error 404</h1><p>The create entry page template was not found.</p>", status=404)
+            
+        async with aiofiles.open(template_path, mode='r') as f:
+            content = await f.read()
+            return html(content)
+    except Exception as e:
+        logger.error(f"Error serving create entry page: {str(e)}", exc_info=True)
+        return html("<h1>Error loading page</h1><p>Unable to load the create entry page. Please try again later.</p>", status=500)
+
 @app.route('/health')
 async def health_check(request):
     return text("OK")
 
 @app.route('/api/info')
 async def api_info(request):
-    return json({
+    return json_response({
         "name": "Time Capsule API",
         "version": "1.0.0",
         "status": "active"
@@ -101,21 +153,9 @@ async def generate_uuid(request):
         # Generate a new UUID
         user_uuid = str(uuid.uuid4())
         
-        # Load existing users
-        async with aiofiles.open(users_file, mode='r') as f:
-            content = await f.read()
-            users = json.loads(content) if content else {}
-        
-        # Add new user with initial empty profile
-        users[user_uuid] = {
-            "name": None,
-            "age": None,
-            "created_at": str(datetime.datetime.now())
-        }
-        
-        # Save updated users
-        async with aiofiles.open(users_file, mode='w') as f:
-            await f.write(json.dumps(users, indent=2))
+        # Create user in database
+        async with request.ctx.session as session:
+            await UserDB.create_user(session, user_uuid)
         
         return json_response({"uuid": user_uuid, "status": "success"})
     except Exception as e:
@@ -138,30 +178,21 @@ async def update_profile(request):
             
         name = data.get('name')
         age = data.get('age')
+        profile_data = data.get('profile_data', {})
         
         # Validate required data
         if not name or not isinstance(name, str):
             return json_response({"status": "error", "message": "Invalid name"}, status=400)
         
-        # Load existing users
-        async with aiofiles.open(users_file, mode='r') as f:
-            content = await f.read()
-            users = json.loads(content) if content else {}
-        
-        # Create or update user profile
-        if user_uuid not in users:
-            users[user_uuid] = {
-                "created_at": str(datetime.datetime.now())
-            }
-        
-        # Update profile fields
-        users[user_uuid]["name"] = name
-        users[user_uuid]["age"] = age
-        users[user_uuid]["updated_at"] = str(datetime.datetime.now())
-        
-        # Save updated users
-        async with aiofiles.open(users_file, mode='w') as f:
-            await f.write(json.dumps(users, indent=2))
+        # Update user in database
+        async with request.ctx.session as session:
+            user = await UserDB.get_user_by_uuid(session, user_uuid)
+            if not user:
+                # Create user if not exists
+                user = await UserDB.create_user(session, user_uuid, name, age, profile_data)
+            else:
+                # Update existing user
+                user = await UserDB.update_user(session, user_uuid, name, age, profile_data)
         
         logger.info(f"User profile updated: {user_uuid}")
         return json_response({"status": "success", "message": "Profile updated successfully"})
@@ -181,25 +212,21 @@ async def get_profile(request):
         if not user_uuid:
             return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
         
-        # Load existing users
-        async with aiofiles.open(users_file, mode='r') as f:
-            content = await f.read()
-            users = json.loads(content) if content else {}
-        
-        # Check if user exists
-        if user_uuid not in users:
-            return json_response({"status": "error", "message": "User not found"}, status=404)
-        
-        # Return user profile
-        profile = users[user_uuid]
-        return json_response({
-            "status": "success",
-            "data": {
-                "uuid": user_uuid,
-                "name": profile.get("name"),
-                "age": profile.get("age")
-            }
-        })
+        # Get user from database
+        async with request.ctx.session as session:
+            user = await UserDB.get_user_by_uuid(session, user_uuid)
+            
+            if not user:
+                return json_response({"status": "error", "message": "User not found"}, status=404)
+            
+            # Get user data as dictionary (includes profile_data)
+            user_data = user.to_dict()
+            
+            # Return user profile
+            return json_response({
+                "status": "success",
+                "data": user_data
+            })
     except Exception as e:
         logger.error(f"Error retrieving profile: {str(e)}", exc_info=True)
         return json_response({"status": "error", "message": "Server error"}, status=500)
@@ -215,22 +242,12 @@ async def reset_device(request):
         
         old_uuid = data.get('old_uuid')
         
-        # Log the reset event (optional, for analytics)
+        # Log the reset event
         logger.info(f"Device reset request for UUID: {old_uuid}")
         
-        # Load existing users
-        async with aiofiles.open(users_file, mode='r') as f:
-            content = await f.read()
-            users = json.loads(content) if content else {}
-        
-        # Mark old user data as reset (optional, for analytics)
-        if old_uuid in users:
-            users[old_uuid]["reset_at"] = str(datetime.datetime.now())
-            users[old_uuid]["is_reset"] = True
-            
-            # Save updated users
-            async with aiofiles.open(users_file, mode='w') as f:
-                await f.write(json.dumps(users, indent=2))
+        # Mark user as reset in database
+        async with request.ctx.session as session:
+            await UserDB.reset_user(session, old_uuid)
         
         return json_response({"status": "success", "message": "Device reset completed"})
     except Exception as e:
@@ -247,25 +264,24 @@ async def get_diary_entries(request):
         if not user_uuid:
             return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
         
-        # Get diary file path
-        diary_file = os.path.join(data_folder, f'diary_{user_uuid}.json')
-        
-        # If file doesn't exist, return empty array
-        if not os.path.exists(diary_file):
-            return json_response({"status": "success", "data": []})
-        
-        # Read diary entries
-        async with aiofiles.open(diary_file, mode='r') as f:
-            content = await f.read()
-            entries = json.loads(content) if content else []
-        
-        # Sort by pinned status and then by date (newest first)
-        sorted_entries = sorted(entries, key=lambda x: (not x.get('pinned', False), x.get('date', ''), x.get('created_at', '')), reverse=True)
-        
-        return json_response({
-            "status": "success",
-            "data": sorted_entries
-        })
+        # Get entries from database
+        async with request.ctx.session as session:
+            entries = await DiaryDB.get_entries_by_user(session, user_uuid)
+            
+            # Convert entries to dictionaries
+            entries_data = [entry.to_dict() for entry in entries]
+            
+            # Sort by pinned status and then by date (newest first)
+            sorted_entries = sorted(
+                entries_data, 
+                key=lambda x: (not x.get('pinned', False), x.get('date', ''), x.get('created_at', '')), 
+                reverse=True
+            )
+            
+            return json_response({
+                "status": "success",
+                "data": sorted_entries
+            })
     except Exception as e:
         logger.error(f"Error retrieving diary entries: {str(e)}", exc_info=True)
         return json_response({"status": "error", "message": "Server error"}, status=500)
@@ -273,16 +289,35 @@ async def get_diary_entries(request):
 @app.route('/api/diary/entries', methods=['POST'])
 async def create_diary_entry(request):
     """Create a new diary entry."""
+    # Add request logging
+    logger.info(f"Received diary entry creation request")
+    
     try:
+        # Log headers for debugging
+        headers = dict(request.headers)
+        logger.info(f"Request headers: {headers}")
+        
         # Get user UUID from header
         user_uuid = request.headers.get('X-User-UUID')
         if not user_uuid:
+            logger.error("Missing user UUID in request headers")
             return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
         
+        logger.info(f"Creating diary entry for user: {user_uuid}")
+        
         # Get diary entry data
-        data = request.json
+        try:
+            data = request.json
+        except Exception as json_error:
+            logger.error(f"Error parsing JSON: {str(json_error)}")
+            return json_response({"status": "error", "message": f"Invalid JSON: {str(json_error)}"}, status=400)
+            
         if not data:
+            logger.error("Missing diary entry data")
             return json_response({"status": "error", "message": "Missing diary entry data"}, status=400)
+        
+        # Log request data for debugging
+        logger.info(f"Diary entry data: {data}")
         
         # Validate required fields
         title = data.get('title')
@@ -290,50 +325,57 @@ async def create_diary_entry(request):
         date = data.get('date')
         
         if not title or not isinstance(title, str):
+            logger.error(f"Invalid title: {title}")
             return json_response({"status": "error", "message": "Invalid title"}, status=400)
         
         if not content or not isinstance(content, str):
+            logger.error(f"Invalid content type or empty content")
             return json_response({"status": "error", "message": "Invalid content"}, status=400)
         
         if not date or not isinstance(date, str):
+            logger.error(f"Invalid date: {date}")
             return json_response({"status": "error", "message": "Invalid date"}, status=400)
         
-        # Get diary file path
-        diary_file = os.path.join(data_folder, f'diary_{user_uuid}.json')
+        # Generate UUID for the entry
+        entry_uuid = str(uuid.uuid4())
+        logger.info(f"Generated entry UUID: {entry_uuid}")
         
-        # Read existing entries or create empty array
-        entries = []
-        if os.path.exists(diary_file):
-            async with aiofiles.open(diary_file, mode='r') as f:
-                content = await f.read()
-                entries = json.loads(content) if content else []
-        
-        # Create new entry with ID
-        entry_id = str(uuid.uuid4())
-        new_entry = {
-            "id": entry_id,
-            "title": title,
-            "content": content,
-            "date": date,
-            "mood": data.get('mood', 'calm'),
-            "pinned": data.get('pinned', False),
-            "created_at": str(datetime.datetime.now()),
-            "updated_at": str(datetime.datetime.now())
-        }
-        
-        # Add new entry
-        entries.append(new_entry)
-        
-        # Save updated entries
-        async with aiofiles.open(diary_file, mode='w') as f:
-            await f.write(json.dumps(entries, indent=2))
-        
-        # Return the new entry
-        return json_response({
-            "status": "success",
-            "message": "Diary entry created successfully",
-            "data": new_entry
-        })
+        # Create entry in database
+        try:
+            async with request.ctx.session as session:
+                # Check if user exists
+                user = await UserDB.get_user_by_uuid(session, user_uuid)
+                if not user:
+                    # Create user if not exists
+                    logger.info(f"User {user_uuid} not found, creating new user")
+                    user = await UserDB.create_user(session, user_uuid)
+                
+                # Create entry
+                entry = await DiaryDB.create_entry(
+                    session,
+                    user_uuid,
+                    entry_uuid,
+                    title,
+                    content,
+                    date,
+                    data.get('mood', 'calm'),
+                    data.get('pinned', False)
+                )
+                
+                # Log success
+                logger.info(f"Diary entry created successfully: {entry_uuid}")
+                
+                # Return the new entry
+                entry_dict = entry.to_dict()
+                
+                return json_response({
+                    "status": "success",
+                    "message": "Diary entry created successfully",
+                    "data": entry_dict
+                })
+        except Exception as db_error:
+            logger.error(f"Database error creating entry: {str(db_error)}", exc_info=True)
+            return json_response({"status": "error", "message": f"Database error: {str(db_error)}"}, status=500)
     except Exception as e:
         logger.error(f"Error creating diary entry: {str(e)}", exc_info=True)
         return json_response({"status": "error", "message": "Server error"}, status=500)
@@ -352,47 +394,35 @@ async def update_diary_entry(request, entry_id):
         if not data:
             return json_response({"status": "error", "message": "Missing diary entry data"}, status=400)
         
-        # Get diary file path
-        diary_file = os.path.join(data_folder, f'diary_{user_uuid}.json')
-        
-        # Check if diary file exists
-        if not os.path.exists(diary_file):
-            return json_response({"status": "error", "message": "Diary entry not found"}, status=404)
-        
-        # Read existing entries
-        async with aiofiles.open(diary_file, mode='r') as f:
-            content = await f.read()
-            entries = json.loads(content) if content else []
-        
-        # Find entry by ID
-        entry_index = None
-        for i, entry in enumerate(entries):
-            if entry.get('id') == entry_id:
-                entry_index = i
-                break
-        
-        # Return error if entry not found
-        if entry_index is None:
-            return json_response({"status": "error", "message": "Diary entry not found"}, status=404)
-        
-        # Update entry fields
-        entries[entry_index]['title'] = data.get('title', entries[entry_index]['title'])
-        entries[entry_index]['content'] = data.get('content', entries[entry_index]['content'])
-        entries[entry_index]['date'] = data.get('date', entries[entry_index]['date'])
-        entries[entry_index]['mood'] = data.get('mood', entries[entry_index]['mood'])
-        entries[entry_index]['pinned'] = data.get('pinned', entries[entry_index]['pinned'])
-        entries[entry_index]['updated_at'] = str(datetime.datetime.now())
-        
-        # Save updated entries
-        async with aiofiles.open(diary_file, mode='w') as f:
-            await f.write(json.dumps(entries, indent=2))
-        
-        # Return the updated entry
-        return json_response({
-            "status": "success",
-            "message": "Diary entry updated successfully",
-            "data": entries[entry_index]
-        })
+        # Update entry in database
+        async with request.ctx.session as session:
+            # Get the entry
+            entry = await DiaryDB.get_entry_by_uuid(session, entry_id)
+            
+            # Check if entry exists and belongs to user
+            if not entry:
+                return json_response({"status": "error", "message": "Diary entry not found"}, status=404)
+            
+            if entry.user_uuid != user_uuid:
+                return json_response({"status": "error", "message": "Access denied"}, status=403)
+            
+            # Update entry
+            entry = await DiaryDB.update_entry(
+                session,
+                entry_id,
+                title=data.get('title'),
+                content=data.get('content'),
+                date=data.get('date'),
+                mood=data.get('mood'),
+                pinned=data.get('pinned')
+            )
+            
+            # Return the updated entry
+            return json_response({
+                "status": "success",
+                "message": "Diary entry updated successfully",
+                "data": entry.to_dict()
+            })
     except Exception as e:
         logger.error(f"Error updating diary entry: {str(e)}", exc_info=True)
         return json_response({"status": "error", "message": "Server error"}, status=500)
@@ -406,35 +436,42 @@ async def delete_diary_entry(request, entry_id):
         if not user_uuid:
             return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
         
-        # Get diary file path
-        diary_file = os.path.join(data_folder, f'diary_{user_uuid}.json')
-        
-        # Check if diary file exists
-        if not os.path.exists(diary_file):
-            return json_response({"status": "error", "message": "Diary entry not found"}, status=404)
-        
-        # Read existing entries
-        async with aiofiles.open(diary_file, mode='r') as f:
-            content = await f.read()
-            entries = json.loads(content) if content else []
-        
-        # Find and remove entry by ID
-        new_entries = [entry for entry in entries if entry.get('id') != entry_id]
-        
-        # Return error if entry not found (length didn't change)
-        if len(new_entries) == len(entries):
-            return json_response({"status": "error", "message": "Diary entry not found"}, status=404)
-        
-        # Save updated entries
-        async with aiofiles.open(diary_file, mode='w') as f:
-            await f.write(json.dumps(new_entries, indent=2))
-        
-        return json_response({
-            "status": "success",
-            "message": "Diary entry deleted successfully"
-        })
+        # Delete entry from database
+        async with request.ctx.session as session:
+            # Get the entry
+            entry = await DiaryDB.get_entry_by_uuid(session, entry_id)
+            
+            # Check if entry exists and belongs to user
+            if not entry:
+                return json_response({"status": "error", "message": "Diary entry not found"}, status=404)
+            
+            if entry.user_uuid != user_uuid:
+                return json_response({"status": "error", "message": "Access denied"}, status=403)
+            
+            # Delete entry
+            success = await DiaryDB.delete_entry(session, entry_id)
+            
+            if success:
+                return json_response({
+                    "status": "success",
+                    "message": "Diary entry deleted successfully"
+                })
+            else:
+                return json_response({"status": "error", "message": "Failed to delete entry"}, status=500)
     except Exception as e:
         logger.error(f"Error deleting diary entry: {str(e)}", exc_info=True)
+        return json_response({"status": "error", "message": "Server error"}, status=500)
+
+@app.route('/api/profile-questions', methods=['GET'])
+async def get_profile_questions(request):
+    """Get the list of profile questions."""
+    try:
+        return json_response({
+            "status": "success",
+            "data": USER_PROFILE_QUESTIONS
+        })
+    except Exception as e:
+        logger.error(f"Error retrieving profile questions: {str(e)}", exc_info=True)
         return json_response({"status": "error", "message": "Server error"}, status=500)
 
 if __name__ == "__main__":
