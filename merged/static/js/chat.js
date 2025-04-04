@@ -220,9 +220,14 @@ function getConnectionInfo() {
 }
 
 /**
- * Load chat messages for the current session
+ * Load chat messages for a session
  */
 async function loadChatMessages(sessionId) {
+    if (!sessionId) {
+        logWarn('No session ID provided to loadChatMessages');
+        return;
+    }
+    
     try {
         logInfo(`Loading chat messages for session ${sessionId}`);
         
@@ -231,49 +236,34 @@ async function loadChatMessages(sessionId) {
             throw new Error('No user UUID found');
         }
         
-        // Always include the user UUID in headers
-        const headers = {
-            'Content-Type': 'application/json',
-            'X-User-UUID': userUUID
-        };
+        // Clear chat display
+        chatMessages.innerHTML = '';
         
-        logInfo(`Fetching messages with UUID: ${userUUID.substring(0, 8)}...`);
+        // Show loading indicator
+        showLoadingIndicator();
         
+        // Fetch messages from the server
         const response = await fetch(`/api/chat/sessions/${sessionId}/messages`, {
             method: 'GET',
-            headers: headers
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-UUID': userUUID
+            }
         });
         
-        // Handle different response statuses
-        if (response.status === 403) {
-            // Session exists but belongs to another user
-            logInfo('Session belongs to another user. Will create a new session on first message.');
+        // Check response
+        if (response.status === 404) {
+            // Session not found, create a new one
+            logWarn(`Chat session ${sessionId} not found, creating a new one`);
+            currentSessionId = generateSessionId(userUUID);
             
-            // Check if server suggested a new session ID
-            const data = await response.json();
-            if (data.new_session_id) {
-                logInfo(`Server suggested new session ID: ${data.new_session_id}`);
-                currentSessionId = data.new_session_id;
-                
-                // Try loading messages with the new session ID
-                return await loadChatMessages(currentSessionId);
-            }
-            
-            // Hide empty state and show welcome message instead
-            emptyChatState.style.display = 'none';
-            
-            // Add a welcome message from the AI to explain what happened
-            const welcomeMessage = `欢迎来到新的聊天会话！之前的会话属于另一个设备或用户，我们已为您创建一个新的聊天会话。请开始输入您的消息，与20岁的自己对话吧！`;
-            addMessageToChat(welcomeMessage, false);
-            
-            return true; // We added welcome message
-        } else if (response.status === 404) {
-            // This shouldn't happen anymore with our server changes, but just in case
-            logInfo('Chat session not found. A new one will be created when sending the first message.');
+            // Show empty state
             emptyChatState.style.display = 'flex';
-            return false; // No messages loaded
-        } else if (!response.ok) {
-            // Any other error status
+            hideLoadingIndicator();
+            return;
+        }
+        
+        if (!response.ok) {
             throw new Error(`Server responded with ${response.status}`);
         }
         
@@ -282,28 +272,38 @@ async function loadChatMessages(sessionId) {
             throw new Error(data.message || 'Unknown error');
         }
         
-        // Add messages to the chat
-        const messages = data.data;
-        logInfo(`Loaded ${messages.length} messages from history`);
+        // Hide empty state when messages are loaded
+        emptyChatState.style.display = 'none';
         
+        // Display messages
+        const messages = data.data || [];
+        logInfo(`Loaded ${messages.length} messages for session ${sessionId}`);
+        
+        // No messages, show empty state
         if (messages.length === 0) {
             emptyChatState.style.display = 'flex';
-            return false; // No messages loaded
+        } else {
+            // Load existing messages 
+            for (const message of messages) {
+                const isUser = message.sender === 'user' || message.is_user;
+                addMessageToChat(message.content, isUser, new Date(message.created_at));
+            }
+            
+            // Ensure chat is scrolled to bottom with history
+            scrollToBottom();
         }
         
-        emptyChatState.style.display = 'none';
-        messages.forEach(message => {
-            addMessageToChat(message.content, message.is_user, new Date(message.created_at));
-        });
-        
-        // Scroll to bottom
-        scrollToBottom();
-        logInfo('Chat history loaded successfully');
-        return true; // Messages were loaded
+        // Hide loading indicator
+        hideLoadingIndicator();
     } catch (error) {
         logError('Error loading chat messages:', error);
-        showError('无法加载聊天记录，请稍后再试');
-        return false;
+        showError('无法加载聊天记录，请刷新页面重试');
+        
+        // Hide loading indicator
+        hideLoadingIndicator();
+        
+        // Show empty state on error
+        emptyChatState.style.display = 'flex';
     }
 }
 
@@ -332,6 +332,9 @@ async function sendMessage() {
         
         // If chat was empty, hide the empty state
         emptyChatState.style.display = 'none';
+        
+        // Ensure scroll is at bottom after adding message
+        scrollToBottom();
         
         // Count messages sent
         messagesSent++;
@@ -389,11 +392,31 @@ async function processMessageQueue() {
 
 /**
  * Add a message to the chat display
+ * @param {string} message - The message content
+ * @param {boolean} isUserMessage - Whether this is a user message
+ * @param {Date} timestamp - Message timestamp
+ * @param {boolean} isError - Whether this is an error message
+ * @param {boolean} isMock - Whether this is a mock response
  */
-function addMessageToChat(message, isUserMessage, timestamp = new Date()) {
+function addMessageToChat(message, isUserMessage, timestamp = new Date(), isError = false, isMock = false) {
     // Create message element
     const messageContainer = document.createElement('div');
-    messageContainer.className = isUserMessage ? 'message user-message' : 'message ai-message';
+    
+    // Add appropriate classes
+    let classes = ['message'];
+    if (isUserMessage) {
+        classes.push('user-message');
+    } else {
+        classes.push('ai-message');
+        
+        if (isError) {
+            classes.push('error-message');
+        } else if (isMock) {
+            classes.push('mock-message');
+        }
+    }
+    
+    messageContainer.className = classes.join(' ');
     
     // Format timestamp
     const formattedTime = formatTime(timestamp);
@@ -436,7 +459,13 @@ function formatTime(date) {
  * Scroll chat to bottom
  */
 function scrollToBottom() {
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Use setTimeout to ensure this happens after DOM update
+    setTimeout(() => {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // For Safari and some mobile browsers that might need extra help
+        window.scrollTo(0, document.body.scrollHeight);
+    }, 10);
 }
 
 /**
@@ -726,6 +755,9 @@ async function sendUserMessage(message) {
         // Show loading indicator
         showLoadingIndicator();
         
+        // Ensure we're scrolled to the bottom when loading
+        scrollToBottom();
+        
         // Send message to the server
         const response = await fetch(`/api/chat/sessions/${currentSessionId}/messages`, {
             method: 'POST',
@@ -765,7 +797,14 @@ async function sendUserMessage(message) {
         
         // Add AI response to chat (user message was already added)
         const aiResponse = data.data.ai_response;
-        addMessageToChat(aiResponse.content, false);
+        const responseText = aiResponse.content || aiResponse.message;
+        
+        // Check if this is a mock or error message
+        const isMock = responseText.startsWith('Echo:') || responseText.includes('this is just a mock response');
+        const isError = responseText.startsWith('Error:');
+        
+        // Add message to chat with appropriate flags
+        addMessageToChat(responseText, false, new Date(aiResponse.timestamp || aiResponse.created_at), isError, isMock);
         
         // Hide loading indicator
         hideLoadingIndicator();
@@ -779,7 +818,7 @@ async function sendUserMessage(message) {
         }
         
         // Return AI response
-        return aiResponse.content;
+        return responseText;
     } catch (error) {
         // Hide loading indicator
         hideLoadingIndicator();
@@ -788,6 +827,11 @@ async function sendUserMessage(message) {
         isPendingResponse = false;
         
         logError('Error sending message to server:', error);
+        
+        // Show error message in chat
+        const errorMessage = `Error: ${error.message}`;
+        addMessageToChat(errorMessage, false, new Date(), true, false);
+        
         showError('无法发送消息，请稍后再试');
         throw error;
     }

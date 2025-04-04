@@ -494,22 +494,35 @@
                     throw new Error('No user UUID found');
                 }
                 
+                // 获取当前聊天ID
+                let chatId = getChatId();
+                let apiUrl = '/api/chat';
+                let requestData = {
+                    message: message,
+                    user_uuid: userUUID
+                };
+                
+                // 如果有聊天ID，使用sessions API
+                if (chatId) {
+                    apiUrl = `/api/chat/sessions/${chatId}/messages`;
+                    // sessions API 不需要在请求体中包含chat_id
+                } else {
+                    // 直接API需要传入chat_id (null也要传)
+                    requestData.chat_id = null;
+                }
+                
                 // 发送消息到服务器
-                const response = await fetch('/api/chat', {
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-User-UUID': userUUID
                     },
-                    body: JSON.stringify({ 
-                        message: message,
-                        chat_id: getChatId(), // 获取当前聊天ID
-                        user_uuid: userUUID // 添加用户UUID
-                    }),
+                    body: JSON.stringify(requestData),
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Failed to send message');
+                    throw new Error(`Failed to send message: ${response.status}`);
                 }
                 
                 const data = await response.json();
@@ -517,12 +530,25 @@
                 // 移除正在输入指示器
                 typingIndicator.remove();
                 
-                // 添加AI回复到聊天界面
-                addMessage(data.response, 'ai');
+                // 处理不同API格式的响应
+                if (data.status === 'success' && data.data && data.data.ai_response) {
+                    // 新sessions API 格式
+                    addMessage(data.data.ai_response.content, 'ai');
+                } else if (data.response) {
+                    // 旧API格式
+                    addMessage(data.response, 'ai');
+                } else {
+                    console.warn('Unexpected response format:', data);
+                    addMessage('收到响应，但格式异常', 'ai');
+                }
                 
                 // 如果是新对话，更新URL中的聊天ID
-                if (data.chat_id && !getChatId()) {
-                    updateChatId(data.chat_id);
+                if (!chatId) {
+                    if (data.chat_id) {
+                        updateChatId(data.chat_id);
+                    } else if (data.data && data.data.ai_response && data.data.ai_response.session_id) {
+                        updateChatId(data.data.ai_response.session_id);
+                    }
                 }
             } catch (error) {
                 // 移除正在输入指示器
@@ -558,7 +584,7 @@
                     throw new Error('No user UUID found');
                 }
                 
-                const response = await fetch(`/api/chat/${chatId}`, {
+                const response = await fetch(`/api/chat/sessions/${chatId}/messages`, {
                     headers: {
                         'X-User-UUID': userUUID
                     }
@@ -573,24 +599,34 @@
                 // 清空现有消息
                 chatMessages.innerHTML = '';
                 
-                // 添加历史消息 - 使用与新消息相同的格式
-                data.messages.forEach(msg => {
-                    const messageContainer = document.createElement('div');
-                    messageContainer.className = `message ${msg.is_user ? 'user' : 'ai'}-message`;
-                    
-                    // 格式化时间戳
-                    const msgDate = new Date(msg.created_at);
-                    const formattedTime = formatTime(msgDate);
-                    
-                    // 添加内容和时间戳
-                    messageContainer.innerHTML = `
-                        <div class="message-content">${formatMessage(msg.content)}</div>
-                        <div class="message-time">${formattedTime}</div>
-                    `;
-                    
-                    // 添加到聊天
-                    chatMessages.appendChild(messageContainer);
-                });
+                if (data.status === 'success' && Array.isArray(data.data)) {
+                    // 添加历史消息 - 使用与新消息相同的格式
+                    data.data.forEach(msg => {
+                        const messageContainer = document.createElement('div');
+                        messageContainer.className = `message ${msg.is_user ? 'user' : 'ai'}-message`;
+                        
+                        // 格式化时间戳
+                        const msgDate = new Date(msg.created_at);
+                        const formattedTime = formatTime(msgDate);
+                        
+                        // 添加内容和时间戳
+                        messageContainer.innerHTML = `
+                            <div class="message-content">${formatMessage(msg.content)}</div>
+                            <div class="message-time">${formattedTime}</div>
+                        `;
+                        
+                        // 添加到聊天
+                        chatMessages.appendChild(messageContainer);
+                    });
+                } else {
+                    console.warn('Unexpected response format:', data);
+                    if (data.messages && Array.isArray(data.messages)) {
+                        // 兼容旧格式
+                        data.messages.forEach(msg => {
+                            addMessage(msg.content, msg.is_user ? 'user' : 'ai', new Date(msg.created_at));
+                        });
+                    }
+                }
                 
                 // 滚动到底部
                 scrollToBottom();
@@ -620,6 +656,37 @@
             
             // 滚动到底部
             scrollToBottom();
+        }
+        
+        /**
+         * 格式化时间为 HH:MM 格式
+         */
+        function formatTime(date) {
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        
+        /**
+         * 格式化消息文本，支持简单的 Markdown 语法
+         */
+        function formatMessage(message) {
+            if (!message) return '';
+            
+            // 转换换行符为 <br>
+            let formatted = message.replace(/\n/g, '<br>');
+            
+            // 简单的粗体和斜体格式
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            return formatted;
+        }
+        
+        /**
+         * 滚动到底部
+         */
+        function scrollToBottom() {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
         
         // 语音识别相关函数

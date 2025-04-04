@@ -136,4 +136,24 @@
         transform: scale(0.8);
         opacity: 0.8;
     }
+}
+
+/* Add styles for error and mock messages */
+.message.ai-message.error-message {
+    background-color: rgba(255, 200, 200, 0.3);
+    border-left: 3px solid #ff5555;
+}
+
+.message.ai-message.error-message .message-content {
+    color: #cc0000;
+}
+
+.message.ai-message.mock-message {
+    background-color: rgba(200, 200, 255, 0.3);
+    border-left: 3px solid #5555ff;
+    font-style: italic;
+}
+
+.message.ai-message.mock-message .message-content {
+    color: #555599;
 } 

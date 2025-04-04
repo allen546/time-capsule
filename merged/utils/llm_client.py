@@ -11,12 +11,23 @@ import json
 import logging
 import asyncio
 import time
-from typing import Dict, List, Optional, Union, Any, Tuple
+import ssl
+import datetime
 import aiohttp
+from typing import Dict, List, Optional, Union, Any, Tuple
 from enum import Enum
+import uuid
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# DeepSeek API configuration
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+DEEPSEEK_MODEL = "deepseek-chat"
+
+# For fallback to mock response if API key is not set
+USE_MOCK_RESPONSE = not DEEPSEEK_API_KEY
 
 
 class LLMProvider(Enum):
@@ -522,4 +533,432 @@ def generate(
                 max_tokens=max_tokens,
                 **kwargs
             )
-        ) 
+        )
+
+
+# Mock function for LLM API call
+async def mock_llm_response(user_message, user_data=None, session_id=None, db_session=None):
+    """Mock function to simulate LLM API call with history."""
+    try:
+        # Initialize response
+        response_parts = [f"Echo: {user_message}"]
+        
+        # Add chat history if session_id and db_session are provided
+        if session_id and db_session:
+            # Import ChatDB locally to avoid circular imports
+            from db import ChatDB
+            
+            # Get previous messages (limited to last 10 for better context)
+            messages = await ChatDB.get_messages_by_session(db_session, session_id, limit=10)
+            
+            # If there are previous messages, include them in the response
+            if messages and len(messages) > 1:  # Only show history if there's more than just the current message
+                # Skip the most recent user message (it's the one we're responding to)
+                previous_messages = [msg for msg in messages if msg.content.strip() != user_message.strip()]
+                
+                if previous_messages:
+                    response_parts.append("\n\nChat History:")
+                    
+                    # Create a seen set to track unique message content
+                    seen_contents = set()
+                    
+                    # Format the chat history with proper indentation and formatting
+                    for msg in previous_messages:
+                        # Skip duplicate content
+                        content_key = msg.content.strip()[:50]  # Use first 50 chars as key
+                        if content_key in seen_contents:
+                            continue
+                        
+                        seen_contents.add(content_key)
+                        speaker = "You" if msg.is_user else "AI"
+                        response_parts.append(f"\n{speaker}: {msg.content}")
+        
+        # If user data is available, personalize the response
+        if user_data and user_data.get('name'):
+            response_parts.append(f"\n\nBy the way, {user_data.get('name')}, this is just a mock response. In the future, we'll connect to a real LLM API.")
+        
+        # Join all parts
+        response = "".join(response_parts)
+        return response
+    except Exception as e:
+        logger.error(f"Error in mock LLM response: {str(e)}")
+        return f"Echo: {user_message} (Error fetching chat history)"
+
+def generate_prompt_from_user_model(user_data, language="zh"):
+    """
+    Generate a customized prompt text based on the user model.
+    
+    Args:
+        user_data: User profile data containing personal information
+        language: Language code ('en' for English, 'zh' for Chinese)
+        
+    Returns:
+        A customized prompt text incorporating user data
+    """
+    # Extract basic user information
+    name = user_data.get("name", "")
+    age = user_data.get("age", "")
+    current_year = datetime.datetime.now().year
+    birth_year = current_year - int(age) if age and str(age).isdigit() else None
+    year_at_20 = birth_year + 20 if birth_year else None
+    
+    # Extract profile data
+    profile_data = user_data.get("profile_data", {})
+    if isinstance(profile_data, str):
+        try:
+            profile_data = json.loads(profile_data)
+        except json.JSONDecodeError:
+            profile_data = {}
+            
+    # Extract questionnaire data
+    location = profile_data.get("location_at_20", "")
+    occupation = profile_data.get("occupation_at_20", "")
+    education = profile_data.get("education", "")
+    major = profile_data.get("major_at_20", "")
+    hobbies = profile_data.get("hobbies_at_20", "")
+    important_people = profile_data.get("important_people_at_20", "")
+    significant_events = profile_data.get("significant_events_at_20", "")
+    concerns = profile_data.get("concerns_at_20", "")
+    dreams = profile_data.get("dreams_at_20", "")
+    family_relations = profile_data.get("family_relations_at_20", "")
+    health = profile_data.get("health_at_20", "")
+    habits = profile_data.get("habits_at_20", "")
+    regrets = profile_data.get("regrets_at_20", "")
+    background = profile_data.get("basic_data", "")
+    personality = profile_data.get("personality", "")
+    
+    # Build the prompt based on language
+    if language == "zh":
+        prompt = f"# 20岁时的{name}的角色设定\n\n"
+        
+        # Basic Information Section
+        prompt += f"## 基本信息\n"
+        if name:
+            prompt += f"- 姓名：{name}\n"
+        if age and birth_year and year_at_20:
+            prompt += f"- 当前年龄：{age}岁（出生于{birth_year}年）\n"
+            prompt += f"- 20岁时的年份：{year_at_20}年\n"
+        if location:
+            prompt += f"- 20岁时居住地：{location}\n"
+        
+        # Occupation/Education Section
+        if occupation or education or major:
+            prompt += f"\n## 学习与工作状况\n"
+            if occupation:
+                prompt += f"- 职业状态：{occupation}\n"
+            if education:
+                prompt += f"- 教育背景：{education}\n"
+            if major:
+                prompt += f"- 所学专业：{major}\n"
+        
+        # Personal Life Section
+        prompt += f"\n## 个人生活\n"
+        if hobbies:
+            prompt += f"- 兴趣爱好：{hobbies}\n"
+        if important_people:
+            prompt += f"- 重要的人：{important_people}\n"
+        if family_relations:
+            prompt += f"- 家庭关系：{family_relations}\n"
+        if health:
+            prompt += f"- 健康状况：{health}\n"
+        if habits:
+            prompt += f"- 生活习惯：{habits}\n"
+            
+        # Mental State Section
+        if personality or concerns or dreams:
+            prompt += f"\n## 心理状态与想法\n"
+            if personality:
+                prompt += f"- 性格特点：{personality}\n"
+            if concerns:
+                prompt += f"- 烦恼与努力方向：{concerns}\n"
+            if dreams:
+                prompt += f"- 对未来的期待和梦想：{dreams}\n"
+            if regrets:
+                prompt += f"- 可能的遗憾或想对自己说的话：{regrets}\n"
+                
+        # Significant Events Section
+        if significant_events:
+            prompt += f"\n## 重大事件\n"
+            prompt += f"{significant_events}\n"
+            
+        # Additional Background
+        if background:
+            prompt += f"\n## 其他背景信息\n"
+            prompt += f"{background}\n"
+            
+        # Role-Playing Guidelines
+        prompt += f"\n## 角色扮演指南\n"
+        prompt += f"""作为20岁的{name}，你应该：
+1. 以一个20岁年轻人的语气和思维方式来回应
+2. 只讨论{year_at_20 if year_at_20 else '你当时'}年及之前的事件和知识
+3. 不要提及未来（对你来说尚未发生）的事情
+4. 表现出20岁时的价值观和世界观，特别考虑以下因素：
+   - 当时的关注点：{concerns if concerns else '典型20岁年轻人的烦恼'}
+   - 对未来的期待：{dreams if dreams else '对未来的希望和梦想'}
+   - 重要的人际关系：{important_people if important_people else '朋友、家人和其他重要的人'}
+5. 如果被问及未来的事情，你可以表达你对未来的期望，但不应该知道实际发生了什么
+6. 你的对话应该反映出你在{location if location else '你生活的地方'}的生活经历和背景"""
+            
+    else:  # English
+        prompt = f"# Character Profile for {name} at Age 20\n\n"
+        
+        # Basic Information Section
+        prompt += f"## Basic Information\n"
+        if name:
+            prompt += f"- Name: {name}\n"
+        if age and birth_year and year_at_20:
+            prompt += f"- Current Age: {age} (Born in {birth_year})\n"
+            prompt += f"- Year when 20 years old: {year_at_20}\n"
+        if location:
+            prompt += f"- Location at age 20: {location}\n"
+            
+        # Occupation/Education Section
+        if occupation or education or major:
+            prompt += f"\n## Education & Occupation\n"
+            if occupation:
+                prompt += f"- Occupational status: {occupation}\n"
+            if education:
+                prompt += f"- Educational background: {education}\n"
+            if major:
+                prompt += f"- Field of study: {major}\n"
+                
+        # Personal Life Section
+        prompt += f"\n## Personal Life\n"
+        if hobbies:
+            prompt += f"- Hobbies and interests: {hobbies}\n"
+        if important_people:
+            prompt += f"- Important people: {important_people}\n"
+        if family_relations:
+            prompt += f"- Family relationships: {family_relations}\n"
+        if health:
+            prompt += f"- Health status: {health}\n"
+        if habits:
+            prompt += f"- Lifestyle habits: {habits}\n"
+            
+        # Mental State Section
+        if personality or concerns or dreams:
+            prompt += f"\n## Mental State & Thoughts\n"
+            if personality:
+                prompt += f"- Personality traits: {personality}\n"
+            if concerns:
+                prompt += f"- Concerns and efforts: {concerns}\n"
+            if dreams:
+                prompt += f"- Expectations and dreams for the future: {dreams}\n"
+            if regrets:
+                prompt += f"- Possible regrets or advice to self: {regrets}\n"
+                
+        # Significant Events Section
+        if significant_events:
+            prompt += f"\n## Significant Events\n"
+            prompt += f"{significant_events}\n"
+            
+        # Additional Background
+        if background:
+            prompt += f"\n## Additional Background\n"
+            prompt += f"{background}\n"
+            
+        # Role-Playing Guidelines
+        prompt += f"\n## Role-Playing Guidelines\n"
+        prompt += f"""As {name} at age 20, you should:
+1. Respond with the tone and mindset of a 20-year-old
+2. Only discuss events and knowledge up to {year_at_20 if year_at_20 else 'your time'}
+3. Don't mention future events (things that haven't happened for you yet)
+4. Reflect the values and worldview you had at 20, especially considering:
+   - Your concerns at the time: {concerns if concerns else "typical concerns of a 20-year-old"}
+   - Your expectations for the future: {dreams if dreams else "hopes and dreams for the future"}
+   - Important relationships: {important_people if important_people else "friends, family, and other important people"}
+5. If asked about future events, you may express your hopes for the future, but should not know what actually happened
+6. Your conversation should reflect your experiences and background in {location if location else "where you lived"}"""
+    
+    return prompt
+
+def create_system_prompt(user_data, language="zh"):
+    """
+    Create a system prompt based on user data.
+    
+    Args:
+        user_data: User profile data
+        language: Language code
+        
+    Returns:
+        Formatted system prompt
+    """
+    # Use the enhanced prompt generator if user data is available
+    if user_data:
+        return generate_prompt_from_user_model(user_data, language)
+    
+    # Default basic prompt if no user data is available
+    if language == "zh":
+        return "你正在模拟与用户20岁时的自己进行对话。"
+    return "You are simulating a conversation with a 20-year-old version of the user."
+
+async def deepseek_chat_completion(user_message, user_data=None, session_id=None, db_session=None):
+    """
+    Get a chat completion from DeepSeek API with conversation history.
+    
+    Args:
+        user_message: The current user message
+        user_data: User profile data for personalization
+        session_id: The current chat session ID
+        db_session: Database session for retrieving message history
+        
+    Returns:
+        The AI response from DeepSeek API or a fallback response
+    """
+    # Import needed modules locally to avoid circular imports
+    from db import ChatDB
+    
+    request_id = str(uuid.uuid4())[:8]  # Generate a short ID for this request
+    logger.info(f"[API:{request_id}] Starting DeepSeek API request for session {session_id}")
+    logger.info(f"[API:{request_id}] API Key: {'[SET]' if DEEPSEEK_API_KEY else '[NOT SET]'}, USE_MOCK_RESPONSE: {USE_MOCK_RESPONSE}")
+    logger.info(f"[API:{request_id}] Using model: {DEEPSEEK_MODEL}")
+    
+    try:
+        # Set preferred language (default to Chinese)
+        language = "zh"
+        
+        # Format system prompt based on user data
+        logger.info(f"[API:{request_id}] Generating system prompt")
+        system_prompt = create_system_prompt(user_data, language)
+        logger.debug(f"[API:{request_id}] System prompt length: {len(system_prompt)} chars")
+        
+        # Prepare messages list with system prompt
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add conversation history if available - limited to 10 messages
+        if session_id and db_session:
+            logger.info(f"[API:{request_id}] Retrieving message history (limited to last 10 messages)")
+            
+            # Get the last 10 messages for context
+            history_messages = await ChatDB.get_messages_by_session(db_session, session_id, limit=10)
+            history_messages = history_messages[::-1]  # Reverse to get newest first
+            
+            # Skip error messages and mock messages
+            filtered_history = []
+            for msg in history_messages:
+                # Skip messages that are errors or mock responses
+                if (not msg.is_user and 
+                   (msg.content.startswith("Error:") or 
+                    msg.content.startswith("Echo:") or
+                    "this is just a mock response" in msg.content)):
+                    logger.debug(f"[API:{request_id}] Skipping error/mock message from history")
+                    continue
+                filtered_history.append(msg)
+            
+            # Limit to last 10 messages after filtering
+            filtered_history = filtered_history[:10]
+            filtered_history.reverse()  # Put back in chronological order
+            
+            logger.info(f"[API:{request_id}] Using {len(filtered_history)} messages from history after filtering")
+            
+            # Add messages to the context (oldest first)
+            for msg in filtered_history:
+                role = "assistant" if not msg.is_user else "user"
+                content = msg.content
+                
+                # Skip the current message if it's in history already
+                if msg.is_user and content.strip() == user_message.strip():
+                    logger.debug(f"[API:{request_id}] Skipping duplicate of current message in history")
+                    continue
+                    
+                messages.append({"role": role, "content": content})
+        
+        # Add the current user message if not already in history
+        messages.append({"role": "user", "content": user_message})
+        logger.info(f"[API:{request_id}] Final message count for context: {len(messages)}")
+        
+        # Prepare API request
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
+        }
+        
+        payload = {
+            "model": DEEPSEEK_MODEL,
+            "messages": messages,
+            "temperature": 0.8,
+            "max_tokens": 1024
+        }
+        
+        # Log the API request details
+        logger.info(f"[API:{request_id}] Request URL: {DEEPSEEK_API_URL}")
+        logger.info(f"[API:{request_id}] Request headers: {{'Content-Type': 'application/json', 'Authorization': 'Bearer [REDACTED]'}}")
+        logger.info(f"[API:{request_id}] Request payload model: {payload['model']}")
+        logger.info(f"[API:{request_id}] Request payload message count: {len(payload['messages'])}")
+        
+        # Create SSL context to handle certificate verification issues
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        # Make API request
+        logger.info(f"[API:{request_id}] Sending request to DeepSeek API with {len(messages)} messages")
+        start_time = datetime.datetime.now()
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                DEEPSEEK_API_URL,
+                headers=headers,
+                json=payload,
+                timeout=60,
+                ssl=ssl_context
+            ) as response:
+                response_time = (datetime.datetime.now() - start_time).total_seconds()
+                logger.info(f"[API:{request_id}] Received response from DeepSeek API in {response_time:.2f} seconds")
+                logger.info(f"[API:{request_id}] Response status code: {response.status}")
+                
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"[API:{request_id}] DeepSeek API request failed with status {response.status}: {error_text}")
+                    
+                    # Check for insufficient balance or other API errors
+                    if "Insufficient Balance" in error_text:
+                        logger.error(f"[API:{request_id}] API account has insufficient balance")
+                        return f"API账户余额不足，无法生成回复。" if language == "zh" else "The API account has insufficient balance."
+                    
+                    # Default to mock response as fallback
+                    logger.warning(f"[API:{request_id}] Using mock response as fallback due to API error")
+                    return await mock_llm_response(user_message, user_data, session_id, db_session)
+                
+                # Process successful response
+                result = await response.json()
+                logger.info(f"[API:{request_id}] Successfully received valid JSON response from DeepSeek API")
+                
+                try:
+                    content = result["choices"][0]["message"]["content"]
+                    content_preview = content[:50] + ('...' if len(content) > 50 else '')
+                    logger.info(f"[API:{request_id}] Response content: '{content_preview}'")
+                    return content
+                except (KeyError, IndexError) as e:
+                    logger.error(f"[API:{request_id}] Error extracting content from DeepSeek API response: {e}")
+                    logger.error(f"[API:{request_id}] Response structure: {json.dumps(result)[:200]}...")
+                    # Fall back to mock response
+                    logger.warning(f"[API:{request_id}] Using mock response as fallback")
+                    return await mock_llm_response(user_message, user_data, session_id, db_session)
+    
+    except Exception as e:
+        logger.error(f"[API:{request_id}] Error in DeepSeek API request: {str(e)}", exc_info=True)
+        # Fall back to mock response
+        logger.warning(f"[API:{request_id}] Using mock response as fallback due to exception")
+        return await mock_llm_response(user_message, user_data, session_id, db_session)
+
+async def llm_response(user_message, user_data=None, session_id=None, db_session=None):
+    """
+    Unified function for getting LLM responses - uses DeepSeek API or mock depending on configuration.
+    
+    Args:
+        user_message: The current user message
+        user_data: User profile data for personalization
+        session_id: The current chat session ID
+        db_session: Database session for retrieving message history
+        
+    Returns:
+        The AI response from the chosen method
+    """
+    # Use mock response if API key is not set or if explicitly configured to use mock
+    if USE_MOCK_RESPONSE:
+        logger.info("Using mock LLM response")
+        return await mock_llm_response(user_message, user_data, session_id, db_session)
+    
+    # Otherwise use DeepSeek API
+    logger.info("Using DeepSeek API for response")
+    return await deepseek_chat_completion(user_message, user_data, session_id, db_session) 

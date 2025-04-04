@@ -1,11 +1,18 @@
 from sanic import Blueprint, response
 from sanic.response import json
-from db import ChatDB, async_session
+from db import ChatDB, async_session, UserDB
 import uuid
 import time
 import logging
 import json as json_module
 from functools import lru_cache
+import sys
+import os
+import importlib
+import datetime
+
+# Import LLM response function from utils instead of app
+from utils.llm_client import llm_response
 
 # Get chat-specific logger
 chat_logger = logging.getLogger('chat')
@@ -112,28 +119,54 @@ async def get_chat(request, chat_id):
         chat_logger.error(f"[API:{request_id}] Error in GET /api/chat/{chat_id}: {str(e)}", exc_info=True)
         return json({'error': str(e)}, status=500)
 
-@chat_bp.route('', methods=['POST'])
+@chat_bp.route('', methods=['POST', 'GET', 'HEAD'])
 async def create_message(request):
-    request_id = getattr(request.ctx, 'request_id', str(uuid.uuid4())[:8])
+    """
+    API endpoint to create a new message.
+    
+    For GET: Returns user chat sessions (backward compatibility)
+    For POST: Creates a new message and returns the AI response
+    """
+    request_id = str(uuid.uuid4())[:8]
+    
+    # Handle GET requests (backward compatibility)
+    if request.method == 'GET' or request.method == 'HEAD':
+        chat_logger.info(f"[API:{request_id}] GET /api/chat request received (backward compatibility)")
+        
+        # Extract user_uuid from query parameters or header
+        user_uuid = request.args.get('user_uuid') or request.headers.get('X-User-UUID')
+        
+        # If no user_uuid is provided, return a temporary UUID and empty list
+        # instead of returning a 400 error for better compatibility
+        if not user_uuid:
+            chat_logger.warning(f"[API:{request_id}] No user_uuid provided in GET request, returning empty response with temporary UUID")
+            user_uuid = f"temp-{str(uuid.uuid4())}"
+            return json({"sessions": [], "user_uuid": user_uuid})
+        
+        # Get chat sessions for this user
+        try:
+            async with async_session() as session:
+                sessions = await ChatDB.get_sessions_by_user(session, user_uuid)
+                return json([session.to_dict() for session in sessions])
+        except Exception as e:
+            chat_logger.error(f"[API:{request_id}] Error fetching chat sessions: {str(e)}")
+            return json({"error": str(e)}, status=500)
+    
+    # Handle POST requests (creating a new message)
     chat_logger.info(f"[API:{request_id}] POST /api/chat request received")
     
     # Log headers for debugging
     headers = dict(request.headers)
     sanitized_headers = {k: v for k, v in headers.items() 
-                       if not any(s in k.lower() for s in ['auth', 'key', 'token', 'secret'])}
+                      if not any(s in k.lower() for s in ['auth', 'key', 'token', 'secret'])}
     chat_logger.debug(f"[API:{request_id}] Request headers: {sanitized_headers}")
     
     try:
-        # Log request body
-        try:
-            data = request.json
-            chat_logger.debug(f"[API:{request_id}] Request body: {data}")
-        except Exception as json_error:
-            chat_logger.error(f"[API:{request_id}] Failed to parse JSON body: {str(json_error)}")
-            request_body = request.body.decode('utf-8') if hasattr(request, 'body') else 'No body'
-            chat_logger.error(f"[API:{request_id}] Raw request body: {request_body[:200]}")
-            return json({'error': f'Invalid JSON in request body: {str(json_error)}'}, status=400)
+        # Parse the request data
+        data = request.json
+        chat_logger.debug(f"[API:{request_id}] Request body: {data}")
         
+        # Extract message and user data
         message = data.get('message')
         chat_id = data.get('chat_id')
         user_uuid = data.get('user_uuid')
@@ -169,10 +202,14 @@ async def create_message(request):
             message_id = str(uuid.uuid4())
             chat_logger.debug(f"[API:{request_id}] Adding user message {message_id}")
             await ChatDB.add_message(session, chat_id, message_id, message, is_user=True)
+        
+            # Get user data for personalization
+            user = await UserDB.get_user_by_uuid(session, user_uuid)
+            user_data = user.to_dict() if user else None
             
-            # Generate AI response (placeholder for now)
-            chat_logger.debug(f"[API:{request_id}] Generating AI response")
-            ai_response = "这是一个测试回复。实际项目中，这里会调用AI模型生成回复。"
+            # Generate AI response using the LLM integration
+            chat_logger.info(f"[API:{request_id}] Generating AI response with LLM integration")
+            ai_response = await llm_response(message, user_data, chat_id, session)
             
             # Create AI message
             ai_message_id = str(uuid.uuid4())
@@ -210,4 +247,189 @@ async def delete_chat(request, chat_id):
             return json({'message': 'Chat deleted successfully'})
     except Exception as e:
         chat_logger.error(f"[API:{request_id}] Error in DELETE /api/chat/{chat_id}: {str(e)}", exc_info=True)
-        return json({'error': str(e)}, status=500) 
+        return json({'error': str(e)}, status=500)
+
+# Add routes for sessions
+@chat_bp.route('/sessions/<session_id>', methods=['GET', 'DELETE'])
+async def session_handler(request, session_id):
+    """Handle get or delete operations for a chat session."""
+    if request.method == 'GET':
+        return await get_chat(request, session_id)
+    elif request.method == 'DELETE':
+        return await delete_chat(request, session_id)
+
+@chat_bp.route('/sessions/<session_id>/messages', methods=['GET', 'POST'])
+async def session_messages_handler(request, session_id):
+    """Handle chat messages within a session."""
+    request_id = getattr(request.ctx, 'request_id', str(uuid.uuid4())[:8])
+    
+    try:
+        if request.method == 'GET':
+            chat_logger.info(f"[API:{request_id}] GET /api/chat/sessions/{session_id}/messages request received")
+            
+            # Check if user has access to this chat
+            user_uuid = request.headers.get('x-user-uuid')
+            if not user_uuid:
+                return json({'error': 'User UUID is required'}, status=400)
+            
+            async with async_session() as session:
+                chat = await ChatDB.get_session_by_uuid(session, session_id)
+                
+                if not chat:
+                    return json({'error': 'Chat session not found'}, status=404)
+                
+                # Verify ownership (optional, based on your security model)
+                if chat.user_uuid != user_uuid:
+                    new_session_id = str(uuid.uuid4())
+                    return json({
+                        'error': 'Session belongs to another user',
+                        'new_session_id': new_session_id
+                    }, status=403)
+                
+                messages = await ChatDB.get_messages_by_session(session, session_id)
+                
+                # Convert to client-friendly format
+                message_dicts = []
+                for msg in messages:
+                    msg_dict = msg.to_dict()
+                    # Adapt to expected frontend format
+                    msg_dict['sender'] = 'user' if msg.is_user else 'ai'
+                    message_dicts.append(msg_dict)
+                
+                return json({
+                    'status': 'success',
+                    'data': message_dicts
+                })
+                
+        elif request.method == 'POST':
+            return await add_chat_message(request, session_id)
+                
+    except Exception as e:
+        chat_logger.error(f"[API:{request_id}] Error in session_messages_handler: {str(e)}", exc_info=True)
+        return json({'error': str(e)}, status=500)
+
+@chat_bp.route('/sessions', methods=['GET'])
+async def get_chat_sessions(request):
+    """Get all chat sessions for a user."""
+    chat_logger.info("GET request to /api/chat/sessions")
+    user_uuid = request.args.get('user_uuid') or request.headers.get('X-User-UUID')
+    
+    if not user_uuid:
+        chat_logger.error("No user_uuid provided in GET request")
+        return json({"error": "No user_uuid provided"}, status=400)
+    
+    try:
+        async with async_session() as db_session:
+            sessions = await ChatDB.get_sessions_by_user(db_session, user_uuid)
+            return json([session.to_dict() for session in sessions])
+    except Exception as e:
+        chat_logger.error(f"Error fetching chat sessions: {str(e)}")
+        return json({"error": str(e)}, status=500)
+
+@chat_bp.route('/sessions', methods=['POST'])
+async def create_chat_session(request):
+    """Create a new chat session."""
+    chat_logger.info("POST request to /api/chat/sessions")
+    request_data = request.json
+    user_uuid = request_data.get('user_uuid')
+    
+    if not user_uuid:
+        chat_logger.error("No user_uuid provided in POST request")
+        return json({"error": "No user_uuid provided"}, status=400)
+    
+    try:
+        session_id = str(uuid.uuid4())
+        async with async_session() as db_session:
+            session = await ChatDB.create_session(db_session, user_uuid, session_id)
+            return json(session.to_dict())
+    except Exception as e:
+        chat_logger.error(f"Error creating chat session: {str(e)}")
+        return json({"error": str(e)}, status=500)
+
+async def add_chat_message(request, session_id):
+    """Add a new message to a chat session and get an AI response."""
+    request_id = str(uuid.uuid4())[:8]
+    chat_logger.info(f"[API:{request_id}] POST request to /api/chat/sessions/{session_id}/messages")
+    
+    # Get request data
+    data = request.json
+    user_message = data.get('message', '')
+    user_uuid = data.get('user_uuid')
+    
+    if not user_message:
+        chat_logger.error(f"[API:{request_id}] No message provided")
+        return json({"error": "No message provided"}, status=400)
+    
+    if not user_uuid:
+        chat_logger.error(f"[API:{request_id}] No user_uuid provided")
+        return json({"error": "No user_uuid provided"}, status=400)
+    
+    try:
+        async with async_session() as session:
+            # Verify the session exists and belongs to this user
+            chat_session = await ChatDB.get_session_by_uuid(session, session_id)
+            if not chat_session:
+                chat_logger.warning(f"[API:{request_id}] Chat session not found")
+                return json({"error": "Chat session not found"}, status=404)
+            
+            if chat_session.user_uuid != user_uuid:
+                chat_logger.warning(f"[API:{request_id}] Session belongs to another user")
+                # Create a new session for this user
+                new_session_id = str(uuid.uuid4())
+                await ChatDB.create_session(session, user_uuid, new_session_id)
+                return json({"error": "Session belongs to another user", 
+                            "new_session_id": new_session_id}, status=403)
+            
+            # Store user message
+            user_msg_id = str(uuid.uuid4())
+            chat_logger.info(f"[API:{request_id}] Adding user message {user_msg_id[:8]}")
+            await ChatDB.add_message(
+                session, 
+                session_id=session_id,
+                message_uuid=user_msg_id,
+                content=user_message,
+                is_user=True
+            )
+            
+            # Get user data for personalization
+            user = await UserDB.get_user_by_uuid(session, user_uuid)
+            user_data = user.to_dict() if user else None
+            
+            # Generate AI response
+            chat_logger.info(f"[API:{request_id}] Generating AI response")
+            try:
+                ai_response = await llm_response(user_message, user_data, session_id, session)
+                
+                # Only store AI response if it's not an error or mock message
+                if not (ai_response.startswith("Error:") or 
+                        ai_response.startswith("Echo:") or
+                        "this is just a mock response" in ai_response):
+                    # Store AI response in database
+                    ai_msg_id = str(uuid.uuid4())
+                    chat_logger.info(f"[API:{request_id}] Adding AI message {ai_msg_id[:8]}")
+                    await ChatDB.add_message(
+                        session, 
+                        session_id=session_id,
+                        message_uuid=ai_msg_id,
+                        content=ai_response,
+                        is_user=False
+                    )
+                else:
+                    chat_logger.info(f"[API:{request_id}] Not storing error/mock response in history")
+            except Exception as e:
+                chat_logger.error(f"[API:{request_id}] Error generating AI response: {str(e)}")
+                ai_response = f"Error: {str(e)}"
+                # We don't store error responses in the database
+            
+            # Format response
+            response_data = {
+                "message": ai_response,
+                "session_id": session_id,
+                "timestamp": datetime.datetime.utcnow().isoformat()
+            }
+            
+            chat_logger.info(f"[API:{request_id}] Response generated successfully")
+            return json({"status": "success", "data": {"ai_response": response_data}})
+    except Exception as e:
+        chat_logger.error(f"[API:{request_id}] Error in add_chat_message: {str(e)}", exc_info=True)
+        return json({"error": str(e)}, status=500) 
