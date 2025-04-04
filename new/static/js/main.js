@@ -3,12 +3,41 @@
  * Handles accessibility features and user interactions
  */
 
-document.addEventListener('DOMContentLoaded', function() {
+// Add timestamp to all script and CSS requests to prevent caching
+(function() {
+    // Only run in development environment
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        const timestamp = new Date().getTime();
+        const linkElements = document.querySelectorAll('link[rel="stylesheet"]');
+        const scriptElements = document.querySelectorAll('script[src]');
+        
+        // Add timestamp to CSS files
+        linkElements.forEach(link => {
+            if (link.href.includes('/static/')) {
+                link.href = link.href + (link.href.includes('?') ? '&' : '?') + '_t=' + timestamp;
+            }
+        });
+        
+        // Add timestamp to JS files
+        scriptElements.forEach(script => {
+            if (script.src.includes('/static/')) {
+                script.src = script.src + (script.src.includes('?') ? '&' : '?') + '_t=' + timestamp;
+            }
+        });
+        
+        console.log('Development mode: Cache busting enabled');
+    }
+})();
+
+document.addEventListener('DOMContentLoaded', async function() {
+    // Initialize user session
+    await initUserSession();
+    
     // Initialize all components
     initFontSizeControls();
     initHighContrastMode();
     initBackToTopButton();
-    initFormValidation();
+    initProfileForm();
     initNavbarToggle();
     
     // Demo functionality for the start chat button
@@ -24,6 +53,80 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+/**
+ * Initialize user session
+ * Gets or creates user UUID and loads profile data
+ */
+async function initUserSession() {
+    try {
+        // Initialize user session
+        const sessionData = await UserSession.initialize();
+        
+        // Display UUID (truncated for privacy)
+        const truncatedUUID = sessionData.uuid.substring(0, 8) + '...';
+        document.getElementById('userUUID').textContent = truncatedUUID;
+        
+        // Update UI with user data if available
+        if (sessionData.name) {
+            document.getElementById('userName').value = sessionData.name;
+            document.getElementById('navUserName').textContent = sessionData.name;
+            document.getElementById('profileNavItem').style.display = 'block';
+        }
+        
+        if (sessionData.age) {
+            document.getElementById('userAge').value = sessionData.age;
+        }
+        
+        console.log('User session initialized:', { uuid: truncatedUUID });
+    } catch (error) {
+        console.error('Failed to initialize user session:', error);
+    }
+}
+
+/**
+ * Profile form handling
+ * Saves user profile data
+ */
+function initProfileForm() {
+    const profileForm = document.getElementById('profileForm');
+    
+    profileForm?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('userName').value.trim();
+        const age = parseInt(document.getElementById('userAge').value, 10);
+        
+        if (!name) {
+            alert('请输入您的姓名');
+            return;
+        }
+        
+        if (isNaN(age) || age < 50 || age > 120) {
+            alert('请输入有效的年龄（50-120之间）');
+            return;
+        }
+        
+        try {
+            // Update user profile
+            await UserSession.updateUserProfile(name, age);
+            
+            // Update UI
+            document.getElementById('navUserName').textContent = name;
+            document.getElementById('profileNavItem').style.display = 'block';
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('profileModal'));
+            if (modal) modal.hide();
+            
+            // Show success message
+            alert('个人资料已成功保存！');
+        } catch (error) {
+            console.error('Failed to update profile:', error);
+            alert('保存个人资料时出错，请稍后再试');
+        }
+    });
+}
 
 /**
  * Font size control functionality
@@ -133,53 +236,6 @@ function initBackToTopButton() {
             top: 0,
             behavior: 'smooth'
         });
-    });
-}
-
-/**
- * Form validation
- * Handles login and registration form validation
- */
-function initFormValidation() {
-    // Login form validation
-    const loginForm = document.getElementById('loginForm');
-    loginForm?.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const username = document.getElementById('loginUsername').value;
-        const password = document.getElementById('loginPassword').value;
-        
-        if (username && password) {
-            // Demo login message - in a real app this would make an API call
-            alert('登录功能即将上线，敬请期待！');
-            
-            // Close the modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
-            if (modal) modal.hide();
-        }
-    });
-    
-    // Registration form validation
-    const registerForm = document.getElementById('registerForm');
-    registerForm?.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const username = document.getElementById('registerUsername').value;
-        const email = document.getElementById('registerEmail').value;
-        const password = document.getElementById('registerPassword').value;
-        const confirmPassword = document.getElementById('confirmPassword').value;
-        
-        if (username && email && password) {
-            if (password !== confirmPassword) {
-                alert('两次输入的密码不匹配，请重新输入！');
-                return;
-            }
-            
-            // Demo registration message - in a real app this would make an API call
-            alert('注册功能即将上线，敬请期待！');
-            
-            // Close the modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('registerModal'));
-            if (modal) modal.hide();
-        }
     });
 }
 

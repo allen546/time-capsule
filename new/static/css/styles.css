@@ -564,6 +564,49 @@ hr {
     color: var(--color-text);
 }
 
+/* User profile styles */
+.user-icon-large {
+    font-size: 5rem;
+    color: var(--color-primary-dark);
+    margin-bottom: 1rem;
+}
+
+.user-icon-large i {
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.device-id {
+    font-size: var(--font-size-base);
+    color: var(--color-text-muted);
+    font-family: monospace;
+    background-color: var(--color-bg-alt);
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+}
+
+.profile-notes {
+    background-color: var(--color-bg-alt);
+    padding: 1rem;
+    border-radius: 10px;
+    font-size: var(--font-size-base);
+    color: var(--color-text-light);
+}
+
+.profile-notes p {
+    margin-bottom: 0.5rem;
+}
+
+.profile-notes i {
+    color: var(--color-primary-dark);
+}
+
+.form-text {
+    color: var(--color-text-muted);
+    font-size: calc(var(--font-size-base) - 2px);
+    margin-top: 0.5rem;
+}
+
 /* Responsive styles */
 @media (max-width: 992px) {
     :root {
