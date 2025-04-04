@@ -30,15 +30,13 @@
 })();
 
 document.addEventListener('DOMContentLoaded', async function() {
-    // Initialize user session
-    await initUserSession();
-    
     // Initialize all components
     initFontSizeControls();
     initHighContrastMode();
     initBackToTopButton();
-    initProfileForm();
     initNavbarToggle();
+    initHelpButtons();
+    initDeviceId();
     
     // Demo functionality for the start chat button
     document.getElementById('startChatBtn')?.addEventListener('click', function() {
@@ -55,76 +53,37 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 /**
- * Initialize user session
- * Gets or creates user UUID and loads profile data
+ * Update device ID display
+ * Shows the device ID wherever it needs to be displayed
  */
-async function initUserSession() {
-    try {
-        // Initialize user session
-        const sessionData = await UserSession.initialize();
-        
-        // Display UUID (truncated for privacy)
-        const truncatedUUID = sessionData.uuid.substring(0, 8) + '...';
-        document.getElementById('userUUID').textContent = truncatedUUID;
-        
-        // Update UI with user data if available
-        if (sessionData.name) {
-            document.getElementById('userName').value = sessionData.name;
-            document.getElementById('navUserName').textContent = sessionData.name;
-            document.getElementById('profileNavItem').style.display = 'block';
-        }
-        
-        if (sessionData.age) {
-            document.getElementById('userAge').value = sessionData.age;
-        }
-        
-        console.log('User session initialized:', { uuid: truncatedUUID });
-    } catch (error) {
-        console.error('Failed to initialize user session:', error);
-    }
-}
-
-/**
- * Profile form handling
- * Saves user profile data
- */
-function initProfileForm() {
-    const profileForm = document.getElementById('profileForm');
+function initDeviceId() {
+    // Find elements that need device ID
+    const deviceIdElements = document.querySelectorAll('#userUUID');
+    if (!deviceIdElements.length) return;
     
-    profileForm?.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const name = document.getElementById('userName').value.trim();
-        const age = parseInt(document.getElementById('userAge').value, 10);
-        
-        if (!name) {
-            alert('请输入您的姓名');
-            return;
-        }
-        
-        if (isNaN(age) || age < 50 || age > 120) {
-            alert('请输入有效的年龄（50-120之间）');
-            return;
-        }
-        
-        try {
-            // Update user profile
-            await UserSession.updateUserProfile(name, age);
-            
-            // Update UI
-            document.getElementById('navUserName').textContent = name;
-            document.getElementById('profileNavItem').style.display = 'block';
-            
-            // Close modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('profileModal'));
-            if (modal) modal.hide();
-            
-            // Show success message
-            alert('个人资料已成功保存！');
-        } catch (error) {
-            console.error('Failed to update profile:', error);
-            alert('保存个人资料时出错，请稍后再试');
-        }
+    // Get UUID from localStorage
+    const uuid = localStorage.getItem('userUUID');
+    if (!uuid) {
+        // If no UUID exists yet, check again after a short delay
+        // This handles cases where UUID is created by another script
+        setTimeout(() => {
+            const newUuid = localStorage.getItem('userUUID');
+            if (newUuid) {
+                deviceIdElements.forEach(element => {
+                    element.textContent = newUuid.substring(0, 8) + '...';
+                });
+            } else {
+                deviceIdElements.forEach(element => {
+                    element.textContent = '未找到';
+                });
+            }
+        }, 500);
+        return;
+    }
+    
+    // Update all elements
+    deviceIdElements.forEach(element => {
+        element.textContent = uuid.substring(0, 8) + '...'; // Only show first 8 chars for privacy
     });
 }
 
@@ -137,6 +96,8 @@ function initFontSizeControls() {
     const normalBtn = document.getElementById('normalFontBtn');
     const increaseBtn = document.getElementById('increaseFontBtn');
     
+    if (!decreaseBtn || !normalBtn || !increaseBtn) return;
+    
     // Function to remove all font size classes
     function removeAllFontSizeClasses() {
         document.body.classList.remove('font-size-large', 'font-size-x-large');
@@ -148,7 +109,7 @@ function initFontSizeControls() {
     }
     
     // Default text size
-    normalBtn?.addEventListener('click', function() {
+    normalBtn.addEventListener('click', function() {
         removeAllFontSizeClasses();
         normalBtn.classList.add('active');
         
@@ -157,7 +118,7 @@ function initFontSizeControls() {
     });
     
     // Large text size
-    increaseBtn?.addEventListener('click', function() {
+    increaseBtn.addEventListener('click', function() {
         removeAllFontSizeClasses();
         document.body.classList.add('font-size-large');
         increaseBtn.classList.add('active');
@@ -167,7 +128,7 @@ function initFontSizeControls() {
     });
     
     // Smaller text size (but still larger than typical websites)
-    decreaseBtn?.addEventListener('click', function() {
+    decreaseBtn.addEventListener('click', function() {
         removeAllFontSizeClasses();
         document.body.classList.add('font-size-x-large');
         decreaseBtn.classList.add('active');
@@ -180,12 +141,12 @@ function initFontSizeControls() {
     const savedFontSize = localStorage.getItem('fontSizePreference');
     if (savedFontSize === 'large') {
         document.body.classList.add('font-size-large');
-        increaseBtn?.classList.add('active');
+        increaseBtn.classList.add('active');
     } else if (savedFontSize === 'x-large') {
         document.body.classList.add('font-size-x-large');
-        decreaseBtn?.classList.add('active');
+        decreaseBtn.classList.add('active');
     } else {
-        normalBtn?.classList.add('active');
+        normalBtn.classList.add('active');
     }
 }
 
@@ -196,7 +157,9 @@ function initFontSizeControls() {
 function initHighContrastMode() {
     const contrastToggle = document.getElementById('highContrastToggle');
     
-    contrastToggle?.addEventListener('change', function() {
+    if (!contrastToggle) return;
+    
+    contrastToggle.addEventListener('change', function() {
         if (this.checked) {
             document.body.classList.add('high-contrast');
             localStorage.setItem('highContrast', 'enabled');
@@ -210,7 +173,7 @@ function initHighContrastMode() {
     const savedContrast = localStorage.getItem('highContrast');
     if (savedContrast === 'enabled') {
         document.body.classList.add('high-contrast');
-        if (contrastToggle) contrastToggle.checked = true;
+        contrastToggle.checked = true;
     }
 }
 
@@ -248,6 +211,8 @@ function initNavbarToggle() {
     const menuToggle = document.querySelector('.navbar-toggler');
     const navbarCollapse = document.querySelector('.navbar-collapse');
     
+    if (!navLinks.length || !menuToggle || !navbarCollapse) return;
+    
     navLinks.forEach(function(link) {
         link.addEventListener('click', function() {
             if (window.innerWidth < 992) {
@@ -256,4 +221,24 @@ function initNavbarToggle() {
             }
         });
     });
+}
+
+/**
+ * Help buttons functionality
+ * Shows the welcome modal when clicked
+ */
+function initHelpButtons() {
+    // Help button in modal
+    const modalShowHelpBtn = document.getElementById('modalShowHelpBtn');
+    if (modalShowHelpBtn && window.UserSession) {
+        modalShowHelpBtn.addEventListener('click', function() {
+            // Close profile modal if open
+            const profileModal = bootstrap.Modal.getInstance(document.getElementById('profileModal'));
+            if (profileModal) profileModal.hide();
+            
+            // Force showing the welcome modal
+            localStorage.setItem('firstVisit', 'true');
+            window.UserSession.showWelcomeModal();
+        });
+    }
 } 

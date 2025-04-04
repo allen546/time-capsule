@@ -36,9 +36,9 @@
 /* High contrast mode variables */
 .high-contrast {
     --color-primary: #ffcc00;
-    --color-primary-light: #ffff00;
+    --color-primary-light: #000000;   /* Changed to black for high contrast */
     --color-primary-dark: #ff8c00;
-    --color-secondary: #ffffff;
+    --color-secondary: #ffff00;       /* Changed to bright yellow for contrast */
     
     --color-bg: #000000;
     --color-bg-alt: #1a1a1a;
@@ -51,6 +51,107 @@
     --color-border: #ffffff;
     --color-focus: #ffff00;
     --color-link: #ffcc00;
+}
+
+/* Additional high contrast styles for hero section */
+.high-contrast .hero {
+    background-color: var(--color-primary-light);  /* Black background */
+    border-top: 2px solid var(--color-secondary);
+    border-bottom: 2px solid var(--color-secondary);
+}
+
+.high-contrast .hero-title {
+    color: var(--color-secondary);  /* Bright yellow for main title */
+}
+
+.high-contrast .hero-subtitle {
+    color: var(--color-text);  /* White text */
+}
+
+.high-contrast .hero-text {
+    color: var(--color-text);  /* White text */
+}
+
+.high-contrast .btn-primary {
+    background-color: var(--color-secondary);  /* Yellow button */
+    color: #000000;  /* Black text on button for contrast */
+    border: 2px solid var(--color-text);  /* White border */
+    font-weight: bold;
+}
+
+.high-contrast .btn-outline {
+    background-color: transparent;
+    color: var(--color-text);  /* White text */
+    border: 2px solid var(--color-text);  /* White border */
+}
+
+.high-contrast .navbar {
+    background-color: #000000;  /* Black navbar */
+    border-bottom: 2px solid var(--color-secondary);  /* Yellow border */
+}
+
+.high-contrast .nav-link {
+    color: var(--color-text);  /* White text */
+}
+
+.high-contrast .nav-link:hover, 
+.high-contrast .nav-link.active {
+    color: var(--color-secondary);  /* Yellow text on hover/active */
+}
+
+.high-contrast .nav-link.active::after {
+    background-color: var(--color-secondary);  /* Yellow underline */
+}
+
+.high-contrast .navbar-brand {
+    color: var(--color-text);  /* White text */
+}
+
+.high-contrast .navbar-brand i {
+    color: var(--color-secondary);  /* Yellow icon */
+}
+
+/* Additional high contrast styles for feature cards */
+.high-contrast .feature-card {
+    background-color: #000000;  /* Black background */
+    border: 2px solid var(--color-secondary);  /* Yellow border */
+}
+
+.high-contrast .feature-icon {
+    background-color: #000000;
+    border: 2px solid var(--color-secondary);
+    color: var(--color-secondary);  /* Yellow icon */
+}
+
+.high-contrast .feature-title {
+    color: var(--color-secondary);  /* Yellow title */
+}
+
+.high-contrast .feature-text {
+    color: var(--color-text);  /* White text */
+}
+
+.high-contrast .btn-feature {
+    background-color: var(--color-secondary);  /* Yellow button */
+    color: #000000;  /* Black text */
+    border: 2px solid var(--color-text);  /* White border */
+}
+
+.high-contrast .accessibility-bar {
+    background-color: #000000;  /* Black background */
+    border-bottom: 2px solid var(--color-secondary);  /* Yellow border */
+}
+
+.high-contrast .btn-font {
+    border: 1px solid var(--color-text);  /* White border */
+    color: var(--color-text);  /* White text */
+}
+
+.high-contrast .btn-font:hover, 
+.high-contrast .btn-font.active {
+    background-color: var(--color-secondary);  /* Yellow background */
+    border-color: var(--color-secondary);  /* Yellow border */
+    color: #000000;  /* Black text */
 }
 
 /* Base styles */
@@ -678,4 +779,67 @@ body.font-size-x-large {
     --font-size-xl: 32px;
     --font-size-xxl: 36px;
     --font-size-header: 40px;
+}
+
+/* High contrast styles for testimonials */
+.high-contrast .testimonial-card {
+    background-color: #000000;  /* Black background */
+    border: 2px solid var(--color-secondary);  /* Yellow border */
+}
+
+.high-contrast .testimonial-name {
+    color: var(--color-secondary);  /* Yellow name */
+}
+
+.high-contrast .testimonial-role {
+    color: var(--color-text);  /* White text */
+}
+
+.high-contrast .testimonial-text {
+    color: var(--color-text);  /* White text */
+}
+
+/* High contrast styles for footer */
+.high-contrast .footer {
+    background-color: #000000;  /* Black background */
+    border-top: 2px solid var(--color-secondary);  /* Yellow border */
+}
+
+.high-contrast .footer-title {
+    color: var(--color-secondary);  /* Yellow title */
+}
+
+.high-contrast .footer-subtitle {
+    color: var(--color-secondary);  /* Yellow subtitle */
+}
+
+.high-contrast .footer-text {
+    color: var(--color-text);  /* White text */
+}
+
+.high-contrast .footer-links a {
+    color: var(--color-text);  /* White links */
+}
+
+.high-contrast .footer-links a:hover {
+    color: var(--color-secondary);  /* Yellow on hover */
+    text-decoration: underline;
+}
+
+.high-contrast .footer-contact li {
+    color: var(--color-text);  /* White text */
+}
+
+.high-contrast hr {
+    border-color: var(--color-secondary);  /* Yellow divider */
+}
+
+.high-contrast .social-icons a {
+    color: var(--color-secondary);  /* Yellow icons */
+    border: 1px solid var(--color-secondary);  /* Yellow border */
+}
+
+.high-contrast .social-icons a:hover {
+    background-color: var(--color-secondary);  /* Yellow background */
+    color: #000000;  /* Black icon */
 } 

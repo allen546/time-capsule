@@ -122,12 +122,19 @@ async def update_profile(request):
         # Get user UUID from header
         user_uuid = request.headers.get('X-User-UUID')
         if not user_uuid:
-            return json_response({"error": "Missing user UUID"}, status=400)
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
         
         # Get profile data from request
         data = request.json
+        if not data:
+            return json_response({"status": "error", "message": "Missing profile data"}, status=400)
+            
         name = data.get('name')
         age = data.get('age')
+        
+        # Validate required data
+        if not name or not isinstance(name, str):
+            return json_response({"status": "error", "message": "Invalid name"}, status=400)
         
         # Load existing users
         async with aiofiles.open(users_file, mode='r') as f:
@@ -149,10 +156,14 @@ async def update_profile(request):
         async with aiofiles.open(users_file, mode='w') as f:
             await f.write(json.dumps(users, indent=2))
         
-        return json_response({"status": "success"})
+        logger.info(f"User profile updated: {user_uuid}")
+        return json_response({"status": "success", "message": "Profile updated successfully"})
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON in request body")
+        return json_response({"status": "error", "message": "Invalid JSON"}, status=400)
     except Exception as e:
-        logger.error(f"Error updating profile: {str(e)}")
-        return json_response({"error": "Could not update profile"}, status=500)
+        logger.error(f"Error updating profile: {str(e)}", exc_info=True)
+        return json_response({"status": "error", "message": "Server error"}, status=500)
 
 @app.route('/api/users/profile', methods=['GET'])
 async def get_profile(request):
@@ -161,7 +172,7 @@ async def get_profile(request):
         # Get user UUID from header
         user_uuid = request.headers.get('X-User-UUID')
         if not user_uuid:
-            return json_response({"error": "Missing user UUID"}, status=400)
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
         
         # Load existing users
         async with aiofiles.open(users_file, mode='r') as f:
@@ -170,18 +181,54 @@ async def get_profile(request):
         
         # Check if user exists
         if user_uuid not in users:
-            return json_response({"error": "User not found"}, status=404)
+            return json_response({"status": "error", "message": "User not found"}, status=404)
         
         # Return user profile
         profile = users[user_uuid]
         return json_response({
-            "uuid": user_uuid,
-            "name": profile.get("name"),
-            "age": profile.get("age")
+            "status": "success",
+            "data": {
+                "uuid": user_uuid,
+                "name": profile.get("name"),
+                "age": profile.get("age")
+            }
         })
     except Exception as e:
-        logger.error(f"Error retrieving profile: {str(e)}")
-        return json_response({"error": "Could not retrieve profile"}, status=500)
+        logger.error(f"Error retrieving profile: {str(e)}", exc_info=True)
+        return json_response({"status": "error", "message": "Server error"}, status=500)
+
+@app.route('/api/users/reset', methods=['POST'])
+async def reset_device(request):
+    """Handle device reset request."""
+    try:
+        # Get old UUID from request body
+        data = request.json
+        if not data:
+            return json_response({"status": "error", "message": "Missing request data"}, status=400)
+        
+        old_uuid = data.get('old_uuid')
+        
+        # Log the reset event (optional, for analytics)
+        logger.info(f"Device reset request for UUID: {old_uuid}")
+        
+        # Load existing users
+        async with aiofiles.open(users_file, mode='r') as f:
+            content = await f.read()
+            users = json.loads(content) if content else {}
+        
+        # Mark old user data as reset (optional, for analytics)
+        if old_uuid in users:
+            users[old_uuid]["reset_at"] = str(datetime.datetime.now())
+            users[old_uuid]["is_reset"] = True
+            
+            # Save updated users
+            async with aiofiles.open(users_file, mode='w') as f:
+                await f.write(json.dumps(users, indent=2))
+        
+        return json_response({"status": "success", "message": "Device reset completed"})
+    except Exception as e:
+        logger.error(f"Error handling device reset: {str(e)}", exc_info=True)
+        return json_response({"status": "error", "message": "Server error"}, status=500)
 
 if __name__ == "__main__":
     try:

@@ -166,7 +166,7 @@ const UserSession = {
    * Update user profile information
    */
   async updateUserProfile(name, age) {
-    let sessionData = await this.getSessionData();
+    const sessionData = await this.getSessionData();
     
     if (!sessionData || !sessionData.uuid) {
       // No session found, initialize first
@@ -182,7 +182,7 @@ const UserSession = {
     
     // Optionally sync with server
     try {
-      await fetch('/api/users/profile', {
+      const response = await fetch('/api/users/profile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -190,12 +190,20 @@ const UserSession = {
         },
         body: JSON.stringify({ name, age })
       });
+      
+      const data = await response.json();
+      
+      if (!response.ok || data.status === 'error') {
+        throw new Error(data.message || `Server responded with ${response.status}`);
+      }
+      
+      return sessionData;
     } catch (e) {
       console.warn("Could not sync profile with server:", e);
-      // Continue anyway, we have local storage
+      // If server sync fails, return local data but add a flag indicating no server sync
+      sessionData.serverSynced = false;
+      return sessionData;
     }
-    
-    return sessionData;
   },
   
   // PRIVATE METHODS
@@ -351,6 +359,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get UUID from localStorage or create new one
     function getOrCreateUUID() {
         let uuid = localStorage.getItem('userUUID');
+        let isFirstVisit = false;
         
         if (!uuid) {
             // Generate UUID (simplified version)
@@ -360,9 +369,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 return v.toString(16);
             });
             localStorage.setItem('userUUID', uuid);
+            
+            // Mark as first visit
+            isFirstVisit = true;
+            localStorage.setItem('firstVisit', 'true');
         }
         
-        return uuid;
+        return { uuid, isFirstVisit };
+    }
+    
+    // Check if this is the first visit
+    function isFirstTimeVisit() {
+        return localStorage.getItem('firstVisit') === 'true';
+    }
+    
+    // Mark as not first visit anymore
+    function markVisited() {
+        localStorage.setItem('firstVisit', 'false');
     }
     
     // Save user profile to IndexedDB
@@ -378,7 +401,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Use ID 1 for the single user profile
             profile.id = 1;
-            profile.uuid = getOrCreateUUID();
+            const { uuid } = getOrCreateUUID();
+            profile.uuid = uuid;
             
             const request = store.put(profile);
             
@@ -443,6 +467,62 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Show welcome modal for first-time visitors
+    function showWelcomeModal() {
+        if (!isFirstTimeVisit()) {
+            return;
+        }
+        
+        // Create welcome modal if it doesn't exist
+        if (!document.getElementById('welcomeModal')) {
+            const modalHTML = `
+                <div class="modal fade" id="welcomeModal" tabindex="-1" aria-labelledby="welcomeModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="welcomeModalLabel">欢迎使用时光胶囊！</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="text-center mb-4">
+                                    <i class="fas fa-hourglass-half fa-4x text-primary mb-3"></i>
+                                    <h4>简便登录系统</h4>
+                                </div>
+                                
+                                <div class="welcome-info">
+                                    <p><i class="fas fa-check-circle me-2 text-success"></i> <strong>无需记住密码</strong> - 我们使用您的设备来识别您，无需记住任何密码。</p>
+                                    <p><i class="fas fa-check-circle me-2 text-success"></i> <strong>自动保存信息</strong> - 您的个人信息会自动保存在此设备上。</p>
+                                    <p><i class="fas fa-check-circle me-2 text-success"></i> <strong>简单易用</strong> - 每次访问时，系统会自动识别您，无需重新登录。</p>
+                                </div>
+                                
+                                <div class="alert alert-info mt-4">
+                                    <i class="fas fa-info-circle me-2"></i> 请注意：如果您更换设备或清除浏览器数据，您需要重新设置个人资料。
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">我知道了</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add modal to body
+            const div = document.createElement('div');
+            div.innerHTML = modalHTML;
+            document.body.appendChild(div.firstElementChild);
+            
+            // Show modal
+            const welcomeModal = new bootstrap.Modal(document.getElementById('welcomeModal'));
+            welcomeModal.show();
+            
+            // Mark as visited when modal is closed
+            document.getElementById('welcomeModal').addEventListener('hidden.bs.modal', function() {
+                markVisited();
+            });
+        }
+    }
+    
     // Initialize the system
     async function initUserSystem() {
         try {
@@ -456,6 +536,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             setupProfileForm();
+            
+            // Show welcome modal for first-time visitors
+            showWelcomeModal();
         } catch (error) {
             console.error("Error initializing user system:", error);
         }
@@ -524,30 +607,167 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                saveUserProfile(profile).then(savedProfile => {
-                    updateUIWithProfile(savedProfile);
-                    
-                    if (isProfilePage) {
-                        // If on profile page, show success message
-                        const successAlert = document.getElementById('profileSuccessAlert');
-                        if (successAlert) {
-                            successAlert.classList.remove('d-none');
-                            setTimeout(() => {
-                                successAlert.classList.add('d-none');
-                            }, 3000);
+                saveUserProfile(profile)
+                    .then(savedProfile => {
+                        updateUIWithProfile(savedProfile);
+                        
+                        if (isProfilePage) {
+                            // If on profile page, show success message
+                            const successAlert = document.getElementById('profileSuccessAlert');
+                            if (successAlert) {
+                                successAlert.classList.remove('d-none');
+                                setTimeout(() => {
+                                    successAlert.classList.add('d-none');
+                                }, 3000);
+                            }
+                        } else {
+                            // If in modal, close it
+                            const profileModal = bootstrap.Modal.getInstance(document.getElementById('profileModal'));
+                            if (profileModal) profileModal.hide();
+                            
+                            // Show toast notification
+                            showToast('个人资料保存成功！');
                         }
-                    } else {
-                        // If in modal, close it
-                        const profileModal = bootstrap.Modal.getInstance(document.getElementById('profileModal'));
-                        if (profileModal) profileModal.hide();
-                    }
-                }).catch(error => {
-                    console.error("Error saving profile:", error);
-                    alert("保存个人资料时出错，请重试。");
-                });
+                    })
+                    .catch(error => {
+                        console.error("Error saving profile:", error);
+                        
+                        // Show consistent error message
+                        const errorMessage = "保存个人资料时出错，请重试。";
+                        
+                        if (isProfilePage) {
+                            // If on profile page, show error message in alert area
+                            const successAlert = document.getElementById('profileSuccessAlert');
+                            if (successAlert) {
+                                successAlert.classList.remove('d-none');
+                                successAlert.classList.remove('alert-success');
+                                successAlert.classList.add('alert-danger');
+                                successAlert.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i> ${errorMessage}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>`;
+                                
+                                setTimeout(() => {
+                                    successAlert.classList.add('d-none');
+                                    successAlert.classList.remove('alert-danger');
+                                    successAlert.classList.add('alert-success');
+                                    successAlert.innerHTML = `<i class="fas fa-check-circle me-2"></i> 个人资料保存成功！
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>`;
+                                }, 3000);
+                            } else {
+                                alert(errorMessage);
+                            }
+                        } else {
+                            alert(errorMessage);
+                        }
+                    });
             });
         }
     }
+    
+    // Helper function to show toast notification
+    function showToast(message) {
+        // Create toast container if it doesn't exist
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Create a unique ID for this toast
+        const toastId = 'toast-' + Date.now();
+        
+        // Create toast HTML
+        const toastHTML = `
+            <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header">
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    <strong class="me-auto">时光胶囊</strong>
+                    <small>刚刚</small>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `;
+        
+        // Add toast to container
+        toastContainer.innerHTML += toastHTML;
+        
+        // Initialize and show the toast
+        const toastElement = document.getElementById(toastId);
+        const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+        toast.show();
+        
+        // Remove toast from DOM after it's hidden
+        toastElement.addEventListener('hidden.bs.toast', function() {
+            toastElement.remove();
+        });
+    }
+    
+    // Expose some functions to window for other scripts to use
+    window.UserSession = {
+        isFirstTimeVisit,
+        markVisited,
+        showWelcomeModal,
+        
+        // Reset device functionality - generates a new device ID and clears all data
+        async resetDevice() {
+            try {
+                // Clear IndexedDB
+                if (db) {
+                    const transaction = db.transaction([USER_STORE], 'readwrite');
+                    const store = transaction.objectStore(USER_STORE);
+                    await new Promise((resolve, reject) => {
+                        const request = store.clear();
+                        request.onsuccess = resolve;
+                        request.onerror = reject;
+                    });
+                }
+                
+                // Clear localStorage items related to user session
+                localStorage.removeItem('userUUID');
+                localStorage.removeItem('userProfile');
+                localStorage.removeItem('firstVisit');
+                
+                // Clear cookies
+                document.cookie = 'userUUID=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                document.cookie = 'userData=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                
+                // Generate new UUID
+                const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    const r = Math.random() * 16 | 0;
+                    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+                
+                // Set as new device
+                localStorage.setItem('userUUID', uuid);
+                localStorage.setItem('firstVisit', 'true');
+                
+                // Try to notify the server about the reset
+                try {
+                    await fetch('/api/users/reset', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ old_uuid: uuid })
+                    });
+                } catch (err) {
+                    // Silently fail if server can't be reached - local reset still works
+                    console.warn('Could not notify server about device reset:', err);
+                }
+                
+                console.log('Device reset successful, new UUID:', uuid);
+                return true;
+            } catch (error) {
+                console.error('Error resetting device:', error);
+                throw error;
+            }
+        }
+    };
     
     // Start the user system
     initUserSystem();

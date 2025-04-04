@@ -98,16 +98,11 @@
                             <div class="device-id mt-2" id="deviceIdDisplay">设备ID: <span id="userUUID">加载中...</span></div>
                         </div>
                         
-                        <div class="alert alert-info mb-4">
-                            <div class="d-flex">
-                                <div class="flex-shrink-0">
-                                    <i class="fas fa-info-circle fa-2x me-3"></i>
-                                </div>
-                                <div>
-                                    <h5 class="alert-heading">您的个人资料将自动保存</h5>
-                                    <p class="mb-0">您无需记住密码，您的资料会自动保存在此设备上。每次访问时，系统会自动识别您的设备。</p>
-                                </div>
-                            </div>
+                        <!-- Help button to show the welcome modal again -->
+                        <div class="text-center mb-4">
+                            <button id="showHelpBtn" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-question-circle me-1"></i> 查看登录系统说明
+                            </button>
                         </div>
                         
                         <form id="profileForm" class="profile-form">
@@ -135,6 +130,15 @@
                                 <li>我们确保您的数据安全，不会泄露给第三方</li>
                                 <li>您可以随时修改您的个人信息</li>
                             </ul>
+                        </div>
+                        
+                        <!-- Delete Device ID Section -->
+                        <div class="mt-5 pt-4 border-top">
+                            <h5 class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i> 重置设备识别</h5>
+                            <p>如果您希望重置设备识别并清除所有个人数据，请点击下方按钮。<strong>此操作不可撤销。</strong></p>
+                            <button id="deleteDeviceBtn" class="btn btn-outline-danger mt-2">
+                                <i class="fas fa-trash-alt me-2"></i> 重置设备识别
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -184,6 +188,42 @@
         <i class="fas fa-arrow-up"></i>
     </button>
 
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteConfirmModalLabel">
+                        <i class="fas fa-exclamation-triangle me-2"></i> 确认重置
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-circle me-2"></i> 
+                        <strong>此操作将:</strong>
+                        <ul class="mt-2 mb-0">
+                            <li>清除您当前保存的所有个人数据</li>
+                            <li>生成新的设备识别码</li>
+                            <li>当作首次使用对待此设备</li>
+                        </ul>
+                    </div>
+                    <p>请在下方输入"<strong>重置我的设备</strong>"以确认操作:</p>
+                    <div class="mb-3">
+                        <input type="text" id="deleteConfirmText" class="form-control" placeholder="重置我的设备">
+                        <div id="deleteConfirmError" class="form-text text-danger d-none">请输入正确的确认文字</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" id="confirmDeleteBtn" class="btn btn-danger" disabled>
+                        确认重置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
@@ -192,5 +232,82 @@
     
     <!-- Custom JavaScript -->
     <script src="/static/js/main.js"></script>
+    
+    <!-- Profile Page Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listener for help button
+            const showHelpBtn = document.getElementById('showHelpBtn');
+            if (showHelpBtn && window.UserSession) {
+                showHelpBtn.addEventListener('click', function() {
+                    // Force showing the welcome modal
+                    localStorage.setItem('firstVisit', 'true');
+                    window.UserSession.showWelcomeModal();
+                });
+            }
+            
+            // Device deletion functionality
+            const deleteDeviceBtn = document.getElementById('deleteDeviceBtn');
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            const deleteConfirmText = document.getElementById('deleteConfirmText');
+            const deleteConfirmError = document.getElementById('deleteConfirmError');
+            
+            if (deleteDeviceBtn) {
+                // Open confirmation modal when delete button is clicked
+                deleteDeviceBtn.addEventListener('click', function() {
+                    const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                    deleteModal.show();
+                });
+            }
+            
+            if (deleteConfirmText && confirmDeleteBtn) {
+                // Check the confirmation text as user types
+                deleteConfirmText.addEventListener('input', function() {
+                    if (this.value === '重置我的设备') {
+                        confirmDeleteBtn.disabled = false;
+                        deleteConfirmError.classList.add('d-none');
+                    } else {
+                        confirmDeleteBtn.disabled = true;
+                        if (this.value && this.value.length > 3) {
+                            deleteConfirmError.classList.remove('d-none');
+                        } else {
+                            deleteConfirmError.classList.add('d-none');
+                        }
+                    }
+                });
+            }
+            
+            if (confirmDeleteBtn && window.UserSession) {
+                // Handle the final deletion confirmation
+                confirmDeleteBtn.addEventListener('click', function() {
+                    if (deleteConfirmText.value === '重置我的设备') {
+                        // Close the modal
+                        bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+                        
+                        // Reset the device - this function is defined in userSession.js
+                        window.UserSession.resetDevice().then(() => {
+                            // Show success alert
+                            const successAlert = document.getElementById('profileSuccessAlert');
+                            if (successAlert) {
+                                successAlert.innerHTML = `
+                                    <i class="fas fa-check-circle me-2"></i> 设备已重置，新的设备ID已生成！
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>
+                                `;
+                                successAlert.classList.remove('d-none');
+                                
+                                // Reload the page after 2 seconds
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 2000);
+                            } else {
+                                // If no alert container exists, just reload
+                                window.location.reload();
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html> 
