@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人资料 - 时光胶囊</title>
+    
+    <!-- Prevent caching in development -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    
+    <!-- Accessibility meta tags -->
+    <meta name="description" content="更新您的个人资料 - 时光胶囊">
+</head>
+<body>
+    <!-- Accessibility skip link -->
+    <a href="#main-content" class="skip-link">跳到主要内容</a>
+    
+    <!-- Header with accessibility controls -->
+    <header>
+        <div class="accessibility-bar">
+            <div class="container d-flex justify-content-end">
+                <div class="font-controls">
+                    <span class="me-2">文字大小:</span>
+                    <button id="decreaseFontBtn" class="btn-font" aria-label="减小文字大小">A-</button>
+                    <button id="normalFontBtn" class="btn-font active" aria-label="文字大小级别">3</button>
+                    <button id="increaseFontBtn" class="btn-font" aria-label="增大文字大小">A+</button>
+                </div>
+                <div class="contrast-toggle ms-4">
+                    <label for="highContrastToggle" class="form-check-label me-2">高对比度:</label>
+                    <input type="checkbox" id="highContrastToggle" class="form-check-input">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main navigation -->
+        <nav class="navbar navbar-expand-lg">
+            <div class="container">
+                <a class="navbar-brand" href="/">
+                    <i class="fas fa-hourglass-half me-2"></i>
+                    <span class="brand-text">时光胶囊</span>
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" 
+                        aria-controls="mainNav" aria-expanded="false" aria-label="切换导航">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/"><i class="fas fa-home me-1"></i> 首页</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/diary"><i class="fas fa-book me-1"></i> 日记</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/chat"><i class="fas fa-comments me-1"></i> 我的对话</a>
+                        </li>
+                        <li class="nav-item active">
+                            <a class="nav-link active" href="/profile"><i class="fas fa-user me-1"></i> 个人资料</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main content -->
+    <main id="main-content" class="py-5">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <!-- Success Alert -->
+                    <div id="profileSuccessAlert" class="alert alert-success alert-dismissible fade show d-none" role="alert">
+                        <i class="fas fa-check-circle me-2"></i> <span class="alert-message">个人资料保存成功！</span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>
+                    </div>
+                    
+                    <div class="profile-card">
+                        <h1 class="profile-title text-center mb-4">个人资料</h1>
+                        
+                        <div class="text-center mb-4">
+                            <div class="user-icon-large">
+                                <i class="fas fa-user-circle"></i>
+                            </div>
+                            <div class="device-id mt-2" id="deviceIdDisplay">设备ID: <span id="userUUID">加载中...</span></div>
+                        </div>
+                        
+                        <!-- Help button to show the welcome modal again -->
+                        <div class="text-center mb-4">
+                            <button id="showHelpBtn" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-question-circle me-1"></i> 查看登录系统说明
+                            </button>
+                        </div>
+                        
+                        <form id="profileForm" class="profile-form">
+                            <div class="mb-4">
+                                <label for="userName" class="form-label">您的姓名</label>
+                                <input type="text" class="form-control form-control-lg" id="userName" placeholder="请输入您的姓名">
+                                <div class="form-text">您的姓名将用于在对话中称呼您</div>
+                            </div>
+                            <div class="mb-4">
+                                <label for="userAge" class="form-label">您的年龄</label>
+                                <input type="number" class="form-control form-control-lg" id="userAge" placeholder="请输入您的年龄" min="50" max="120">
+                                <div class="form-text">我们需要了解您的年龄以便提供更好的服务</div>
+                            </div>
+                            
+                            <!-- Profile Questions Section -->
+                            <h3 class="mt-5 mb-4 text-center">关于您的20岁</h3>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i> 请回答以下问题，帮助我们更好地了解您20岁时的情况。这将帮助我们提供更真实的对话体验。
+                            </div>
+                            
+                            <div id="profileQuestionsContainer">
+                                <!-- Profile questions will be loaded here dynamically -->
+                                <div class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                    <p class="mt-2">加载问题中...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2 mt-5">
+                                <button type="submit" class="btn btn-primary btn-lg py-3">保存资料</button>
+                                <a href="/" class="btn btn-outline btn-lg py-2">返回首页</a>
+                            </div>
+                        </form>
+                        
+                        <div class="profile-notes mt-5">
+                            <h5><i class="fas fa-shield-alt me-2"></i> 隐私保护说明</h5>
+                            <ul>
+                                <li>您的资料仅会存储在您使用的设备上</li>
+                                <li>我们确保您的数据安全，不会泄露给第三方</li>
+                                <li>您可以随时修改您的个人信息</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Delete Device ID Section -->
+                        <div class="mt-5 pt-4 border-top">
+                            <h5 class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i> 重置设备识别</h5>
+                            <p>如果您希望重置设备识别并清除所有个人数据，请点击下方按钮。<strong>此操作不可撤销。</strong></p>
+                            <button id="deleteDeviceBtn" class="btn btn-outline-danger mt-2">
+                                <i class="fas fa-trash-alt me-2"></i> 重置设备识别
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 mb-4 mb-md-0">
+                    <h2 class="footer-title">时光胶囊</h2>
+                    <p class="footer-text">与20岁的自己对话，重温青春记忆。</p>
+                </div>
+                <div class="col-md-4 mb-4 mb-md-0">
+                    <h3 class="footer-subtitle">快速链接</h3>
+                    <ul class="footer-links">
+                        <li><a href="/">首页</a></li>
+                        <li><a href="/diary">日记</a></li>
+                        <li><a href="/chat">我的对话</a></li>
+                        <li><a href="/profile">个人资料</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h3 class="footer-subtitle">联系我们</h3>
+                    <ul class="footer-contact">
+                        <li><i class="fas fa-envelope me-2"></i> contact@timecapsule.com</li>
+                        <li><i class="fas fa-phone me-2"></i> +86 123 4567 8910</li>
+                    </ul>
+                </div>
+            </div>
+            <hr>
+            <div class="footer-bottom">
+                <p class="copyright">&copy; 2023 时光胶囊. 保留所有权利.</p>
+                <div class="social-icons">
+                    <a href="#" aria-label="微信"><i class="fab fa-weixin"></i></a>
+                    <a href="#" aria-label="微博"><i class="fab fa-weibo"></i></a>
+                    <a href="#" aria-label="QQ"><i class="fab fa-qq"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Back to top button -->
+    <button id="backToTopBtn" aria-label="返回顶部">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteConfirmModalLabel">
+                        <i class="fas fa-exclamation-triangle me-2"></i> 确认重置
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-circle me-2"></i> 
+                        <strong>此操作将:</strong>
+                        <ul class="mt-2 mb-0">
+                            <li>清除您当前保存的所有个人数据</li>
+                            <li>生成新的设备识别码</li>
+                            <li>当作首次使用对待此设备</li>
+                        </ul>
+                    </div>
+                    <p>请在下方输入"<strong>重置我的设备</strong>"以确认操作:</p>
+                    <div class="mb-3">
+                        <input type="text" id="deleteConfirmText" class="form-control" placeholder="重置我的设备">
+                        <div id="deleteConfirmError" class="form-text text-danger d-none">请输入正确的确认文字</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" id="confirmDeleteBtn" class="btn btn-danger" disabled>
+                        确认重置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- User Session System -->
+    <script src="/static/js/userSession.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="/static/js/main.js"></script>
+    
+    <!-- Profile Page Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Add event listener for help button
+            const showHelpBtn = document.getElementById('showHelpBtn');
+            if (showHelpBtn && window.UserSession) {
+                showHelpBtn.addEventListener('click', function() {
+                    // Force showing the welcome modal
+                    localStorage.setItem('firstVisit', 'true');
+                    window.UserSession.showWelcomeModal();
+                });
+            }
+            
+            // Link the current name to name at 20 field
+            const userNameInput = document.getElementById('userName');
+            if (userNameInput) {
+                userNameInput.addEventListener('input', function() {
+                    // Find the name at 20 question (question ID 1)
+                    const nameAt20Input = document.getElementById('profile_question_1');
+                    if (nameAt20Input && !nameAt20Input.dataset.manuallyChanged) {
+                        nameAt20Input.value = this.value;
+                    }
+                });
+            }
+            
+            // Device deletion functionality
+            const deleteDeviceBtn = document.getElementById('deleteDeviceBtn');
+            const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+            const deleteConfirmText = document.getElementById('deleteConfirmText');
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            const deleteConfirmError = document.getElementById('deleteConfirmError');
+            
+            if (deleteDeviceBtn) {
+                deleteDeviceBtn.addEventListener('click', function() {
+                    // Show confirmation modal
+                    deleteConfirmModal.show();
+                });
+            }
+            
+            if (deleteConfirmText && confirmDeleteBtn) {
+                // Enable confirm button only if text matches
+                deleteConfirmText.addEventListener('input', function() {
+                    if (this.value === '重置我的设备') {
+                        confirmDeleteBtn.disabled = false;
+                        deleteConfirmError.classList.add('d-none');
+                    } else {
+                        confirmDeleteBtn.disabled = true;
+                        if (this.value && this.value.length > 3) {
+                            deleteConfirmError.classList.remove('d-none');
+                        } else {
+                            deleteConfirmError.classList.add('d-none');
+                        }
+                    }
+                });
+                
+                // Handle confirmation button click
+                confirmDeleteBtn.addEventListener('click', async function() {
+                    try {
+                        // Show loading state
+                        this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...';
+                        this.disabled = true;
+                        
+                        // Reset device
+                        await window.UserSession.resetDevice();
+                        
+                        // Hide modal
+                        deleteConfirmModal.hide();
+                        
+                        // Show success message
+                        alert('设备已重置。请刷新页面以重新开始。');
+                        
+                        // Reload page
+                        window.location.reload();
+                    } catch (error) {
+                        console.error('Error resetting device:', error);
+                        alert('重置失败，请稍后再试。');
+                        this.innerHTML = '确认重置';
+                        this.disabled = false;
+                    }
+                });
+            }
+            
+            // Initialize profile form
+            const profileForm = document.getElementById('profileForm');
+            const userAgeInput = document.getElementById('userAge');
+            const userUUIDDisplay = document.getElementById('userUUID');
+            const profileSuccessAlert = document.getElementById('profileSuccessAlert');
+            const profileQuestionsContainer = document.getElementById('profileQuestionsContainer');
+            
+            // Show UUID in UI
+            if (userUUIDDisplay) {
+                const uuid = localStorage.getItem('userUUID') || '未设置';
+                userUUIDDisplay.textContent = uuid;
+            }
+            
+            // Load profile questions
+            try {
+                const questions = await window.UserSession.getProfileQuestions();
+                renderProfileQuestions(questions, profileQuestionsContainer);
+            } catch (error) {
+                console.error('Error loading profile questions:', error);
+                profileQuestionsContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i> 
+                        无法加载个人问题，请稍后再试
+                    </div>
+                `;
+            }
+            
+            // Load user profile data
+            try {
+                const userData = await window.UserSession.getSessionData();
+                
+                // Populate form with user data
+                if (userData && userNameInput && userAgeInput) {
+                    userNameInput.value = userData.name || '';
+                    userAgeInput.value = userData.age || '';
+                    
+                    // Fill in profile questions if we have data
+                    if (userData.profile_data) {
+                        populateProfileQuestions(userData.profile_data);
+                    }
+                    
+                    // If name at 20 is not filled but name is, copy name to that field
+                    const nameAt20Input = document.getElementById('profile_question_1');
+                    if (nameAt20Input && !nameAt20Input.value && userData.name) {
+                        nameAt20Input.value = userData.name;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading user data:', error);
+            }
+            
+            // Handle form submission
+            if (profileForm) {
+                profileForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    try {
+                        // Show loading state
+                        const submitBtn = this.querySelector('button[type="submit"]');
+                        const originalBtnText = submitBtn.innerHTML;
+                        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 保存中...';
+                        submitBtn.disabled = true;
+                        
+                        // Get form data
+                        const name = userNameInput.value.trim();
+                        const age = parseInt(userAgeInput.value, 10);
+                        
+                        // Collect profile questions data
+                        const profileData = collectProfileQuestionsData();
+                        
+                        // Validate
+                        if (!name) {
+                            alert('请输入您的姓名');
+                            submitBtn.innerHTML = originalBtnText;
+                            submitBtn.disabled = false;
+                            return;
+                        }
+                        
+                        // Update profile
+                        await window.UserSession.updateUserProfile(name, age, profileData);
+                        
+                        // Show success message
+                        if (profileSuccessAlert) {
+                            profileSuccessAlert.classList.remove('d-none');
+                            setTimeout(() => {
+                                profileSuccessAlert.classList.add('d-none');
+                            }, 5000);
+                        }
+                        
+                        // Reset button
+                        submitBtn.innerHTML = originalBtnText;
+                        submitBtn.disabled = false;
+                    } catch (error) {
+                        console.error('Error saving profile:', error);
+                        alert('保存失败，请稍后再试。');
+                        
+                        // Reset button state
+                        const submitBtn = this.querySelector('button[type="submit"]');
+                        submitBtn.innerHTML = '保存资料';
+                        submitBtn.disabled = false;
+                    }
+                });
+            }
+            
+            // Function to render profile questions
+            function renderProfileQuestions(questions, container) {
+                if (!container) return;
+                
+                let html = '';
+                
+                questions.forEach(question => {
+                    const questionId = `profile_question_${question.id}`;
+                    let additionalAttrs = '';
+                    
+                    // If this is the name question (ID 1), add a handler to track manual changes
+                    if (question.id === 1) {
+                        additionalAttrs = 'data-is-name-field="true"'; 
+                    }
+                    
+                    html += `
+                        <div class="profile-question mb-4">
+                            <label for="${questionId}" class="form-label">${question.question_zh}</label>
+                            <textarea class="form-control" id="${questionId}" 
+                                      rows="3" data-question-id="${question.id}" ${additionalAttrs}
+                                      placeholder="${question.hint_zh}"></textarea>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+                
+                // Add event listeners to track manual changes to the name at 20 field
+                const nameAt20Input = document.getElementById('profile_question_1');
+                if (nameAt20Input) {
+                    nameAt20Input.addEventListener('input', function() {
+                        this.dataset.manuallyChanged = 'true';
+                    });
+                }
+            }
+            
+            // Function to populate profile questions with existing data
+            function populateProfileQuestions(profileData) {
+                const inputs = document.querySelectorAll('[data-question-id]');
+                inputs.forEach(input => {
+                    const questionId = input.dataset.questionId;
+                    if (profileData[questionId]) {
+                        input.value = profileData[questionId];
+                        
+                        // Mark name field as manually changed if it has a value
+                        if (questionId === '1') {
+                            input.dataset.manuallyChanged = 'true';
+                        }
+                    }
+                });
+            }
+            
+            // Function to collect profile questions data
+            function collectProfileQuestionsData() {
+                const profileData = {};
+                const inputs = document.querySelectorAll('[data-question-id]');
+                
+                inputs.forEach(input => {
+                    const questionId = input.dataset.questionId;
+                    const value = input.value.trim();
+                    if (value) {
+                        profileData[questionId] = value;
+                    }
+                });
+                
+                return profileData;
+            }
+
+            // Debounce function to prevent too many save requests
+            function debounce(func, wait) {
+                let timeout;
+                return function(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+            
+            // Auto-save function
+            const autoSaveProfile = debounce(async function() {
+                try {
+                    console.log('Auto-saving profile data...');
+                    
+                    // Get form data
+                    const name = userNameInput.value.trim();
+                    const age = parseInt(userAgeInput.value, 10) || '';
+                    
+                    // Don't save if name is empty
+                    if (!name) {
+                        console.log('Not auto-saving: name is empty');
+                        return;
+                    }
+                    
+                    // Collect profile questions data
+                    const profileData = collectProfileQuestionsData();
+                    
+                    // Update profile
+                    await window.UserSession.updateUserProfile(name, age, profileData);
+                    
+                    // Show brief saving indicator that fades after 1 second
+                    if (profileSuccessAlert) {
+                        const alertMsg = profileSuccessAlert.querySelector('.alert-message');
+                        if (alertMsg) alertMsg.textContent = '数据已自动保存';
+                        
+                        profileSuccessAlert.classList.remove('d-none');
+                        setTimeout(() => {
+                            profileSuccessAlert.classList.add('d-none');
+                        }, 1000);
+                    }
+                    
+                    console.log('Profile auto-saved successfully');
+                } catch (error) {
+                    console.error('Error auto-saving profile:', error);
+                    // Silently fail on auto-save errors
+                }
+            }, 2000); // Wait 2 seconds after last input before saving
+            
+            // Add input event listeners for auto-save
+            if (userNameInput) {
+                userNameInput.addEventListener('input', autoSaveProfile);
+            }
+            
+            if (userAgeInput) {
+                userAgeInput.addEventListener('input', autoSaveProfile);
+            }
+            
+            // Add event listeners to all profile question fields
+            document.addEventListener('input', function(e) {
+                const target = e.target;
+                if (target.hasAttribute('data-question-id')) {
+                    autoSaveProfile();
+                }
+            });
+            
+            // Ensure auto-save doesn't conflict with manual save
+            if (profileForm) {
+                profileForm.addEventListener('submit', function() {
+                    // Cancel any pending auto-saves when manually saving
+                    clearTimeout(autoSaveProfile.timeout);
+                });
+            }
+        });
+    </script>
+</body>
+</html> 
