@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时光胶囊 - 与20岁的自己对话</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    
+    <!-- Accessibility meta tags -->
+    <meta name="description" content="时光胶囊让您与20岁的自己对话，重温青春记忆">
+</head>
+<body>
+    <!-- Accessibility skip link -->
+    <a href="#main-content" class="skip-link">跳到主要内容</a>
+    
+    <!-- Header with accessibility controls -->
+    <header>
+        <div class="accessibility-bar">
+            <div class="container d-flex justify-content-end">
+                <div class="font-controls">
+                    <span class="me-2">文字大小:</span>
+                    <button id="decreaseFontBtn" class="btn-font" aria-label="减小文字大小">A-</button>
+                    <button id="normalFontBtn" class="btn-font active" aria-label="正常文字大小">A</button>
+                    <button id="increaseFontBtn" class="btn-font" aria-label="增大文字大小">A+</button>
+                </div>
+                <div class="contrast-toggle ms-4">
+                    <label for="highContrastToggle" class="form-check-label me-2">高对比度:</label>
+                    <input type="checkbox" id="highContrastToggle" class="form-check-input">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main navigation -->
+        <nav class="navbar navbar-expand-lg">
+            <div class="container">
+                <a class="navbar-brand" href="#">
+                    <i class="fas fa-hourglass-half me-2"></i>
+                    <span class="brand-text">时光胶囊</span>
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" 
+                        aria-controls="mainNav" aria-expanded="false" aria-label="切换导航">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#"><i class="fas fa-home me-1"></i> 首页</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-clipboard-list me-1"></i> 问卷调查</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-comments me-1"></i> 我的对话</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-user me-1"></i> 个人资料</a>
+                        </li>
+                    </ul>
+                    <div class="ms-lg-4 mt-3 mt-lg-0">
+                        <button class="btn btn-auth btn-login me-2" data-bs-toggle="modal" data-bs-target="#loginModal">
+                            <i class="fas fa-sign-in-alt me-1"></i> 登录
+                        </button>
+                        <button class="btn btn-auth btn-register" data-bs-toggle="modal" data-bs-target="#registerModal">
+                            <i class="fas fa-user-plus me-1"></i> 注册
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main content -->
+    <main id="main-content">
+        <!-- Hero section -->
+        <section class="hero">
+            <div class="container">
+                <div class="row align-items-center">
+                    <div class="col-lg-6 hero-content">
+                        <h1 class="hero-title">与20岁的自己对话</h1>
+                        <p class="hero-subtitle">回到青春时光，重温年轻的梦想与热情</p>
+                        <p class="hero-text">时光胶囊让您能够与20岁的自己进行对话，分享人生经验，寻找遗失的记忆。</p>
+                        <div class="hero-buttons">
+                            <button class="btn btn-primary btn-lg" id="startChatBtn">
+                                <i class="fas fa-comments me-2"></i>开始对话
+                            </button>
+                            <button class="btn btn-outline btn-lg ms-2" id="learnMoreBtn">
+                                <i class="fas fa-info-circle me-2"></i>了解更多
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-lg-6 mt-5 mt-lg-0 text-center">
+                        <img src="/static/images/time-capsule.svg" alt="时光胶囊示意图" class="hero-image img-fluid">
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- How it works section -->
+        <section class="how-it-works">
+            <div class="container">
+                <h2 class="section-title text-center">如何使用时光胶囊</h2>
+                <div class="row g-4 mt-4">
+                    <div class="col-md-4">
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-clipboard-list"></i>
+                            </div>
+                            <h3 class="feature-title">第一步: 完成问卷</h3>
+                            <p class="feature-text">填写关于您20岁时的详细问卷，包括生活、学习、工作和梦想。</p>
+                            <a href="#" class="btn btn-feature">开始填写问卷</a>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <h3 class="feature-title">第二步: 系统学习</h3>
+                            <p class="feature-text">我们的AI系统会学习您的经历和性格，创建您20岁时的个性模型。</p>
+                            <button class="btn btn-feature" disabled>系统自动处理</button>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                            <h3 class="feature-title">第三步: 开始对话</h3>
+                            <p class="feature-text">与20岁的自己进行文字对话，分享人生经验，重温青春记忆。</p>
+                            <a href="#" class="btn btn-feature">开始对话</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Testimonials section -->
+        <section class="testimonials">
+            <div class="container">
+                <h2 class="section-title text-center">用户体验</h2>
+                <div class="row g-4 mt-4">
+                    <div class="col-md-6">
+                        <div class="testimonial-card">
+                            <div class="testimonial-header">
+                                <img src="/static/images/user1.svg" alt="张先生头像" class="testimonial-avatar">
+                                <div class="testimonial-user">
+                                    <h3 class="testimonial-name">张先生, 65岁</h3>
+                                    <p class="testimonial-role">退休教师</p>
+                                </div>
+                            </div>
+                            <p class="testimonial-text">"通过时光胶囊，我重新找回了20岁时的热情和梦想。与年轻的自己对话，让我回忆起很多被遗忘的美好回忆，也帮助我重新思考人生的意义。"</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="testimonial-card">
+                            <div class="testimonial-header">
+                                <img src="/static/images/user2.svg" alt="李女士头像" class="testimonial-avatar">
+                                <div class="testimonial-user">
+                                    <h3 class="testimonial-name">李女士, 70岁</h3>
+                                    <p class="testimonial-role">退休医生</p>
+                                </div>
+                            </div>
+                            <p class="testimonial-text">"起初我对这个技术有些怀疑，但当我开始与20岁的自己对话，我感到非常震撼。那些年轻时的想法和梦想，与我现在的人生经历形成了有趣的对比。"</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 mb-4 mb-md-0">
+                    <h2 class="footer-title">时光胶囊</h2>
+                    <p class="footer-text">与20岁的自己对话，重温青春记忆。</p>
+                </div>
+                <div class="col-md-4 mb-4 mb-md-0">
+                    <h3 class="footer-subtitle">快速链接</h3>
+                    <ul class="footer-links">
+                        <li><a href="#">首页</a></li>
+                        <li><a href="#">问卷调查</a></li>
+                        <li><a href="#">我的对话</a></li>
+                        <li><a href="#">个人资料</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h3 class="footer-subtitle">联系我们</h3>
+                    <ul class="footer-contact">
+                        <li><i class="fas fa-envelope me-2"></i> contact@timecapsule.com</li>
+                        <li><i class="fas fa-phone me-2"></i> +86 123 4567 8910</li>
+                    </ul>
+                </div>
+            </div>
+            <hr>
+            <div class="footer-bottom">
+                <p class="copyright">&copy; 2023 时光胶囊. 保留所有权利.</p>
+                <div class="social-icons">
+                    <a href="#" aria-label="微信"><i class="fab fa-weixin"></i></a>
+                    <a href="#" aria-label="微博"><i class="fab fa-weibo"></i></a>
+                    <a href="#" aria-label="QQ"><i class="fab fa-qq"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Back to top button -->
+    <button id="backToTopBtn" aria-label="返回顶部">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- Login Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loginModalLabel">登录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="loginUsername" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="loginUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="loginPassword" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="loginPassword" required>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="rememberMe">
+                            <label class="form-check-label" for="rememberMe">记住我</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">登录</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div class="modal fade" id="registerModal" tabindex="-1" aria-labelledby="registerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="registerModalLabel">注册</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="registerForm">
+                        <div class="mb-3">
+                            <label for="registerUsername" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="registerUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="registerEmail" class="form-label">电子邮箱</label>
+                            <input type="email" class="form-control" id="registerEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="registerPassword" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="registerPassword" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">确认密码</label>
+                            <input type="password" class="form-control" id="confirmPassword" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">注册</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="/static/js/main.js"></script>
+</body>
+</html> 
