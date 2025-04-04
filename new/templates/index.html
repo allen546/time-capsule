@@ -459,20 +459,20 @@
             <div class="feature-card">
                 <h2 class="card-title">Talk to Your 20s</h2>
                 <div class="card-buttons">
-                    <button class="btn btn-custom">
+                    <a href="#" class="btn btn-custom" id="startChatLink">
                         <i class="fas fa-comments me-2"></i>开始对话
-                    </button>
-                    <button class="btn btn-custom">
+                    </a>
+                    <a href="#" class="btn btn-custom" id="myChatsLink">
                         <i class="fas fa-history me-2"></i>我的对话
-                    </button>
+                    </a>
                 </div>
             </div>
             <div class="feature-card">
                 <h2 class="card-title">日记</h2>
                 <div class="card-buttons">
-                    <button class="btn btn-custom">
+                    <a href="#" class="btn btn-custom" id="diaryLink">
                         <i class="fas fa-book me-2"></i>查看日记
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>
@@ -697,6 +697,16 @@
             const featureCards = document.querySelectorAll('.feature-card');
             const buttons = document.querySelectorAll('.btn-custom');
             let clickCount = 0;
+
+            // 更新按钮链接
+            const startChatLink = document.getElementById('startChatLink');
+            const myChatsLink = document.getElementById('myChatsLink');
+            const diaryLink = document.getElementById('diaryLink');
+
+            // 这里等待你提供实际的链接
+            // startChatLink.href = "你的开始对话链接";
+            // myChatsLink.href = "你的我的对话链接";
+            // diaryLink.href = "你的日记链接";
 
             document.addEventListener('click', function(e) {
                 if (clickCount === 0) {

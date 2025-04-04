@@ -204,8 +204,8 @@ a:focus, button:focus, input:focus, select:focus, textarea:focus {
 /* Accessibility bar */
 .accessibility-bar {
     background-color: var(--color-bg-alt);
-    padding: 0.5rem 0;
-    font-size: var(--font-size-lg);
+    padding: 0.75rem 0;
+    font-size: 16px !important;
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -213,17 +213,29 @@ a:focus, button:focus, input:focus, select:focus, textarea:focus {
     background: transparent;
     border: 1px solid var(--color-text);
     padding: 0.25rem 0.5rem;
-    margin: 0 0.25rem;
+    margin: 0 0.35rem;
     border-radius: 4px;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.3s ease;
+    font-size: 16px !important;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-font:hover, .btn-font.active {
     background-color: var(--color-primary);
     border-color: var(--color-primary);
     color: white;
+}
+
+/* Make active button more prominent */
+.btn-font.active {
+    font-weight: bold;
+    border-width: 2px;
 }
 
 /* Navigation */
@@ -939,6 +951,11 @@ hr {
     border-bottom: 1px solid var(--color-text);
 }
 
+.high-contrast .diary-entry .card-header h2,
+.high-contrast .diary-entry .card-header small {
+    color: var(--color-text); /* Ensures text is white in high contrast mode */
+}
+
 .high-contrast .diary-title {
     color: var(--color-secondary);
 }
@@ -946,6 +963,62 @@ hr {
 .high-contrast #emptyDiaryState {
     background-color: #1a1a1a !important;
     border: 1px solid var(--color-text);
+}
+
+/* Form controls in high contrast mode */
+.high-contrast .form-check-input {
+    background-color: #000;
+    border: 2px solid var(--color-text);
+}
+
+.high-contrast .form-check-input:checked {
+    background-color: var(--color-secondary);
+    border-color: var(--color-secondary);
+}
+
+.high-contrast .form-check-label {
+    color: var(--color-text);
+}
+
+/* Button styles in high contrast mode */
+.high-contrast .btn-outline-primary,
+.high-contrast .btn-outline-secondary,
+.high-contrast .btn-outline-danger,
+.high-contrast .btn-outline-success,
+.high-contrast .btn-outline-warning {
+    color: var(--color-text);
+    border-color: var(--color-text);
+    background-color: transparent;
+}
+
+.high-contrast .btn-outline-primary:hover,
+.high-contrast .btn-outline-secondary:hover,
+.high-contrast .btn-outline-danger:hover,
+.high-contrast .btn-outline-success:hover,
+.high-contrast .btn-outline-warning:hover {
+    color: #000000;
+    background-color: var(--color-secondary);
+    border-color: var(--color-secondary);
+}
+
+/* Specific button styles to ensure visibility */
+.high-contrast .diary-entry .entry-actions .btn {
+    color: var(--color-text);
+    border-color: var(--color-text);
+    background-color: transparent;
+}
+
+.high-contrast .diary-entry .entry-actions .btn:hover {
+    color: #000000;
+    background-color: var(--color-secondary);
+    border-color: var(--color-secondary);
+}
+
+/* Badge styles in high contrast mode */
+.high-contrast .badge.bg-warning {
+    background-color: var(--color-secondary) !important;
+    color: #000000;
+    border: 1px solid #000000;
 }
 
 /* Pagination high contrast */
@@ -964,4 +1037,54 @@ hr {
 .high-contrast .page-item.disabled .page-link {
     background-color: #333;
     color: #aaa;
+}
+
+/* Accessibility Controls - Fixed Size */
+.accessibility-bar .font-controls,
+.accessibility-bar .contrast-toggle,
+.accessibility-bar button,
+.accessibility-bar span,
+.accessibility-bar label {
+    font-size: 16px !important;
+    line-height: 1.4 !important;
+}
+
+/* Add more space between font controls and contrast toggle */
+.contrast-toggle {
+    margin-left: 1.5rem !important;
+    display: flex;
+    align-items: center;
+}
+
+.contrast-toggle .form-check-label {
+    margin-right: 0.5rem;
+}
+
+.contrast-toggle .form-check-input {
+    width: 22px; /* Increased from 20px */
+    height: 22px; /* Increased from 20px */
+    margin-top: 0;
+    cursor: pointer;
+}
+
+/* High contrast toggle in high contrast mode */
+.high-contrast .contrast-toggle .form-check-input {
+    border: 2px solid var(--color-secondary);
+}
+
+/* Keep fixed size even in high contrast mode */
+.high-contrast .accessibility-bar,
+.high-contrast .accessibility-bar button,
+.high-contrast .accessibility-bar span,
+.high-contrast .accessibility-bar label {
+    font-size: 16px !important;
+}
+
+/* Fix for text-muted in high contrast mode - especially for dates */
+.high-contrast .text-muted {
+    color: var(--color-text) !important; /* Force white text for all muted text in high contrast mode */
+}
+
+.high-contrast .diary-title {
+    color: var(--color-secondary);
 } 
