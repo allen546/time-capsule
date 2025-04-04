@@ -20,7 +20,6 @@ import aiofiles
 from functools import wraps
 from websockets.exceptions import WebSocketProtocolError
 from sqlalchemy.exc import DBAPIError
-from typing import Dict, List, Optional, Union, Any, Tuple
 
 # Import database module
 from db import init_db, get_session, DiaryDB, UserDB, ChatDB, async_session
@@ -28,23 +27,12 @@ from db import init_db, get_session, DiaryDB, UserDB, ChatDB, async_session
 # Import profile questions
 from data.user_profile_questions import USER_PROFILE_QUESTIONS
 
-# Import route blueprints
-from routes.chat import chat_bp
-from routes.contacts import bp as contacts_bp
-
-# Import LLM utils instead of defining functions here
-from utils.llm_client import llm_response
-
 def configure_logging():
     """Configure application logging."""
     # Basic logging configuration
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('app.log')
-        ]
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
     # Reduce noise from Sanic loggers
@@ -53,38 +41,12 @@ def configure_logging():
     logging.getLogger('sanic.root').setLevel(logging.ERROR)
     logging.getLogger('sanic.error').setLevel(logging.WARNING)
     
-    # Set up chat-related loggers with detailed logging - Debug level to catch everything
+    # Set up other loggers as needed
     websocket_logger = logging.getLogger('websocket')
     websocket_logger.setLevel(logging.INFO)
     
-    # Create a detailed formatter for chat logs
-    detailed_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
-    # Configure chat logger to show DEBUG level (maximum detail)
-    chat_logger = logging.getLogger('chat')
-    chat_logger.setLevel(logging.DEBUG)  # Set to DEBUG to capture all detail
-    
-    # Add a StreamHandler for console output with the detailed formatter
-    chat_handler = logging.StreamHandler()
-    chat_handler.setFormatter(detailed_formatter)
-    chat_handler.setLevel(logging.DEBUG)
-    chat_logger.addHandler(chat_handler)
-    
-    # Set up non-chat API loggers with minimal logging
     api_logger = logging.getLogger('api')
     api_logger.setLevel(logging.INFO)
-    
-    # Set up specific loggers for non-chat components
-    diary_logger = logging.getLogger('diary')
-    diary_logger.setLevel(logging.WARNING)  # Only log warnings and errors
-    
-    profile_logger = logging.getLogger('profile')
-    profile_logger.setLevel(logging.WARNING)  # Only log warnings and errors
-    
-    contacts_logger = logging.getLogger('contacts')
-    contacts_logger.setLevel(logging.WARNING)  # Only log warnings and errors
     
     # Get the application logger
     app_logger = logging.getLogger(__name__)
@@ -146,37 +108,35 @@ async def log_request_details(request):
     path = request.path
     method = request.method
     
-    # Log basic request info for all requests
+    # Log basic request info
     logger.info(f"[REQ:{request_id}] {method} {path}")
     
-    # Only log detailed debug information for chat-related paths
-    if '/chat' in path or path.startswith('/api/chat'):
-        # Log headers (especially authentication headers)
-        headers = dict(request.headers)
-        sanitized_headers = headers.copy()
+    # Log headers (especially authentication headers)
+    headers = dict(request.headers)
+    sanitized_headers = headers.copy()
+    
+    # Remove sensitive information from logs
+    for key in headers:
+        if 'auth' in key.lower() or 'key' in key.lower() or 'token' in key.lower():
+            sanitized_headers[key] = "[REDACTED]"
+    
+    # Log important headers for debugging
+    important_headers = ['x-user-uuid', 'x-client-id', 'content-type', 'user-agent']
+    header_info = {k: headers.get(k, 'N/A') for k in important_headers}
+    logger.info(f"[REQ:{request_id}] Headers: {header_info}")
+    
+    # For API routes, log more details
+    if path.startswith('/api/'):
+        # Log query parameters
+        if request.args:
+            logger.info(f"[REQ:{request_id}] Query params: {dict(request.args)}")
         
-        # Remove sensitive information from logs
-        for key in headers:
-            if 'auth' in key.lower() or 'key' in key.lower() or 'token' in key.lower():
-                sanitized_headers[key] = "[REDACTED]"
-        
-        # Log important headers for debugging
-        important_headers = ['x-user-uuid', 'x-client-id', 'content-type', 'user-agent']
-        header_info = {k: headers.get(k, 'N/A') for k in important_headers}
-        logger.info(f"[REQ:{request_id}] Headers: {header_info}")
-        
-        # For API chat routes, log more details
-        if path.startswith('/api/chat'):
-            # Log query parameters
-            if request.args:
-                logger.info(f"[REQ:{request_id}] Query params: {dict(request.args)}")
-            
-            # For chat message endpoints, log additional details
-            if 'chat/sessions' in path and '/messages' in path:
-                user_uuid = headers.get('x-user-uuid', 'MISSING')
-                user_uuid_display = user_uuid[:8] if user_uuid and user_uuid != 'MISSING' else 'MISSING'
-                session_id = path.split('/')[-2] if '/sessions/' in path else 'unknown'
-                logger.info(f"[REQ:{request_id}] Chat request for session {session_id} from user {user_uuid_display}")
+        # For chat message endpoints, log additional details
+        if 'chat/sessions' in path and '/messages' in path:
+            user_uuid = headers.get('x-user-uuid', 'MISSING')
+            user_uuid_display = user_uuid[:8] if user_uuid and user_uuid != 'MISSING' else 'MISSING'
+            session_id = path.split('/')[-2] if '/sessions/' in path else 'unknown'
+            logger.info(f"[REQ:{request_id}] Chat request for session {session_id} from user {user_uuid_display}")
     
     return None
 
@@ -192,7 +152,7 @@ async def log_response_details(request, response):
     # Get request ID from context
     request_id = getattr(request.ctx, 'request_id', 'unknown')
     
-    # Get path, method and status
+    # Log status code and path
     status = response.status
     path = request.path
     method = request.method
@@ -203,38 +163,35 @@ async def log_response_details(request, response):
         elapsed = (datetime.datetime.now() - request.ctx.request_start_time).total_seconds()
         timing_info = f" in {elapsed:.2f}s"
     
-    # Log basic response info for all requests
     logger.info(f"[RES:{request_id}] {method} {path} → {status}{timing_info}")
     
-    # For error responses, always log details
+    # For error responses, log more details
     if status >= 400:
-        # For chat-related paths, log more detailed error information
-        if '/chat' in path or path.startswith('/api/chat'):
-            # For specific paths with permissions issues, log more details
-            if status == 403 and path.startswith('/api/chat/sessions/'):
-                headers = dict(request.headers)
-                user_uuid = headers.get('x-user-uuid', 'MISSING')
-                logger.warning(f"[ERROR:{request_id}] Permission denied for {user_uuid}")
-                
-                # Log session details for debugging
-                session_id = path.split('/')[4] if len(path.split('/')) > 4 else 'unknown'
-                logger.warning(f"[ERROR:{request_id}] Session access denied: {session_id}")
-                
-                # Store this event for analysis
-                try:
-                    asyncio.create_task(
-                        store_error_event(
-                            error_type="permission_denied", 
-                            user_uuid=user_uuid,
-                            session_id=session_id,
-                            path=path,
-                            headers=headers
-                        )
+        # For specific paths with permissions issues, log more details
+        if status == 403 and path.startswith('/api/chat/sessions/'):
+            headers = dict(request.headers)
+            user_uuid = headers.get('x-user-uuid', 'MISSING')
+            logger.warning(f"[ERROR:{request_id}] Permission denied for {user_uuid}")
+            
+            # Log session details for debugging
+            session_id = path.split('/')[4] if len(path.split('/')) > 4 else 'unknown'
+            logger.warning(f"[ERROR:{request_id}] Session access denied: {session_id}")
+            
+            # Store this event for analysis
+            try:
+                asyncio.create_task(
+                    store_error_event(
+                        error_type="permission_denied", 
+                        user_uuid=user_uuid,
+                        session_id=session_id,
+                        path=path,
+                        headers=headers
                     )
-                except Exception as e:
-                    logger.error(f"[ERROR:{request_id}] Failed to store error event: {str(e)}")
-        
-        # Always log error response bodies regardless of path
+                )
+            except Exception as e:
+                logger.error(f"[ERROR:{request_id}] Failed to store error event: {str(e)}")
+                
+        # Try to get response body for error details
         try:
             if hasattr(response, 'body'):
                 body = response.body.decode('utf-8')
@@ -290,10 +247,6 @@ async def add_no_cache_headers(request, response):
 # Configure static serving
 app.static('/static', static_folder)
 
-# Register blueprints
-app.blueprint(chat_bp)
-app.blueprint(contacts_bp)
-
 # Event listeners for database initialization
 @app.listener('before_server_start')
 async def setup_db(app, loop):
@@ -320,12 +273,7 @@ async def setup_db(app, loop):
 # Routes
 @app.route('/')
 async def index(request):
-    """Redirect to intro page."""
-    return redirect('/intro')
-
-@app.route('/home')
-async def home(request):
-    """Serve the main page."""
+    """Serve the index page."""
     try:
         async with aiofiles.open(os.path.join(templates_folder, 'index.html'), mode='r') as f:
             content = await f.read()
@@ -343,75 +291,37 @@ async def profile(request):
 @app.route('/diary')
 async def diary(request):
     """Serve the diary page."""
-    diary_logger = logging.getLogger('diary')
-    try:
-        async with aiofiles.open(os.path.join(templates_folder, 'diary.html'), mode='r') as f:
-            content = await f.read()
-            diary_logger.debug("Diary page served successfully")
-            return html(content)
-    except Exception as e:
-        diary_logger.error(f"Error serving diary page: {str(e)}")
-        return html("<h1>Error loading page</h1><p>Unable to load the diary page. Please try again later.</p>", status=500)
+    async with aiofiles.open(os.path.join(templates_folder, 'diary.html'), mode='r') as f:
+        content = await f.read()
+    return html(content)
 
 @app.route('/chat')
 async def chat(request):
     """Serve the chat page."""
-    chat_logger = logging.getLogger('chat')
     try:
-        chat_logger.info("Serving chat page")
-        chat_logger.debug("Loading chat.html template")
+        logger.info("Serving chat page")
         async with aiofiles.open(os.path.join(templates_folder, 'chat.html'), mode='r') as f:
             content = await f.read()
-        chat_logger.debug("Chat page template loaded successfully")
         return html(content)
     except Exception as e:
-        chat_logger.error(f"Error serving chat page: {str(e)}", exc_info=True)
+        logger.error(f"Error serving chat page: {str(e)}", exc_info=True)
         return html("<h1>Error loading page</h1><p>Unable to load the chat page. Please try again later.</p>", status=500)
-
-@app.route('/my-chats')
-async def my_chats(request):
-    """Serve the my chats page."""
-    chat_logger = logging.getLogger('chat')
-    try:
-        chat_logger.info("Serving my chats page")
-        chat_logger.debug("Loading my_chats.html template")
-        async with aiofiles.open(os.path.join(templates_folder, 'my_chats.html'), mode='r') as f:
-            content = await f.read()
-        chat_logger.debug("My chats page template loaded successfully")
-        return html(content)
-    except Exception as e:
-        chat_logger.error(f"Error serving my chats page: {str(e)}", exc_info=True)
-        return html("<h1>Error loading page</h1><p>Unable to load the my chats page. Please try again later.</p>", status=500)
-
-@app.route('/contacts')
-async def contacts(request):
-    """Serve the contacts page."""
-    contacts_logger = logging.getLogger('contacts')
-    try:
-        contacts_logger.debug("Serving contacts page")
-        async with aiofiles.open(os.path.join(templates_folder, 'contacts.html'), mode='r') as f:
-            content = await f.read()
-            return html(content)
-    except Exception as e:
-        contacts_logger.error(f"Error serving contacts page: {str(e)}", exc_info=True)
-        return html("<h1>Error loading page</h1><p>Unable to load the contacts page. Please try again later.</p>", status=500)
 
 @app.route('/create-entry', methods=['GET'])
 async def create_entry(request):
     """Serve the create entry page."""
-    diary_logger = logging.getLogger('diary')
     try:
-        diary_logger.debug("Serving create entry page")
+        logger.info("Serving create entry page")
         template_path = os.path.join(templates_folder, 'create_entry.html')
         if not os.path.exists(template_path):
-            diary_logger.error(f"Template file not found: {template_path}")
+            logger.error(f"Template file not found: {template_path}")
             return html("<h1>Error 404</h1><p>The create entry page template was not found.</p>", status=404)
             
         async with aiofiles.open(template_path, mode='r') as f:
             content = await f.read()
             return html(content)
     except Exception as e:
-        diary_logger.error(f"Error serving create entry page: {str(e)}", exc_info=True)
+        logger.error(f"Error serving create entry page: {str(e)}", exc_info=True)
         return html("<h1>Error loading page</h1><p>Unable to load the create entry page. Please try again later.</p>", status=500)
 
 @app.route('/health')
@@ -426,7 +336,7 @@ async def api_info(request):
         "status": "active"
     })
 
-# Handler for direct /api/chat requests (which appear to be causing 400 errors)
+# User management API
 @app.route('/api/users/generate-uuid', methods=['POST'])
 async def generate_uuid(request):
     """Generate a new UUID for anonymous users."""
@@ -755,147 +665,322 @@ async def get_profile_questions(request):
         logger.error(f"Error getting profile questions: {str(e)}")
         return json_response({"status": "error", "message": "Could not retrieve profile questions"}, status=500)
 
-# Add admin route
-@app.route('/admin')
-async def admin(request):
-    """Serve the admin page."""
+# Chat API Routes
+@app.route('/api/chat/sessions', methods=['GET'])
+async def get_chat_sessions(request):
+    """Get all chat sessions for the user."""
     try:
-        logger.info("Serving admin page")
-        async with aiofiles.open(os.path.join(templates_folder, 'admin.html'), mode='r') as f:
-            content = await f.read()
-        return html(content)
-    except Exception as e:
-        logger.error(f"Error serving admin page: {str(e)}", exc_info=True)
-        return html("<h1>Error loading page</h1><p>Unable to load the admin page. Please try again later.</p>", status=500)
-
-# Admin API for user management
-@app.route('/api/admin/users', methods=['GET'])
-async def get_users(request):
-    """Get all users (admin only)."""
-    # Check admin token
-    admin_token = request.headers.get('X-Admin-Token')
-    if admin_token != "admin123":  # Hard-coded password for development only
-        return json_response({"error": "Unauthorized"}, status=401)
-    
-    try:
-        async with async_session() as session:
-            users = await UserDB.get_all_users(session)
-            return json_response({
-                "status": "success",
-                "users": [user.to_dict() for user in users]
-            })
-    except Exception as e:
-        logger.error(f"Error in get_users: {str(e)}", exc_info=True)
-        return json_response({"error": str(e)}, status=500)
-
-@app.route('/api/admin/users/<user_uuid>', methods=['DELETE'])
-async def delete_user(request, user_uuid):
-    """Delete a user and all their associated data (admin only)."""
-    # Check admin token
-    admin_token = request.headers.get('X-Admin-Token')
-    if admin_token != "admin123":  # Hard-coded password for development only
-        return json_response({"error": "Unauthorized"}, status=401)
-    
-    try:
-        async with async_session() as session:
-            # Check delete mode from query params (default to delete everything)
-            delete_mode = request.args.get('mode', 'all')
+        # Get user UUID from header
+        user_uuid = request.headers.get('X-User-UUID')
+        if not user_uuid:
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
+        
+        # Get chat sessions from database
+        async with request.ctx.session as session:
+            # Verify user exists
+            user = await UserDB.get_user_by_uuid(session, user_uuid)
+            if not user:
+                return json_response({"status": "error", "message": "User not found"}, status=404)
+                
+            chat_sessions = await ChatDB.get_sessions_by_user(session, user_uuid)
             
-            if delete_mode == 'all':
-                # Delete user and all associated data
-                await UserDB.delete_user(session, user_uuid)
-                message = f"User {user_uuid} and all associated data deleted successfully"
-            elif delete_mode == 'chats':
-                # Only delete chat sessions, keep the user
-                await ChatDB.delete_all_sessions_by_user(session, user_uuid)
-                message = f"All chat sessions for user {user_uuid} deleted successfully"
-            elif delete_mode == 'diary':
-                # Only delete diary entries, keep the user
-                await DiaryDB.delete_entries_by_user(session, user_uuid)
-                message = f"All diary entries for user {user_uuid} deleted successfully"
+        # Convert to dict
+        sessions_data = [session.to_dict() for session in chat_sessions]
+        
+        return json_response({
+            "status": "success",
+            "data": sessions_data
+        })
+    except Exception as e:
+        logger.error(f"Error getting chat sessions: {str(e)}")
+        return json_response({"status": "error", "message": "Could not retrieve chat sessions"}, status=500)
+
+@app.route('/api/chat/sessions', methods=['POST'])
+async def create_chat_session(request):
+    """Create a new chat session."""
+    try:
+        # Get user UUID from header
+        user_uuid = request.headers.get('X-User-UUID')
+        if not user_uuid:
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
+            
+        # Get data from request
+        data = request.json
+        if not data:
+            return json_response({"status": "error", "message": "Missing request data"}, status=400)
+            
+        title = data.get('title', 'New Chat')
+        
+        # Generate a new session UUID
+        session_uuid = str(uuid.uuid4())
+        
+        # Create chat session in database
+        async with request.ctx.session as session:
+            # Verify user exists
+            user = await UserDB.get_user_by_uuid(session, user_uuid)
+            if not user:
+                return json_response({"status": "error", "message": "User not found"}, status=404)
+                
+            chat_session = await ChatDB.create_session(session, user_uuid, session_uuid, title)
+            
+        # Return the created chat session
+        return json_response({
+            "status": "success",
+            "data": chat_session.to_dict()
+        })
+    except Exception as e:
+        logger.error(f"Error creating chat session: {str(e)}")
+        return json_response({"status": "error", "message": "Could not create chat session"}, status=500)
+
+@app.route('/api/chat/sessions/<session_id>', methods=['DELETE'])
+async def delete_chat_session(request, session_id):
+    """Delete a chat session."""
+    try:
+        # Get user UUID from header
+        user_uuid = request.headers.get('X-User-UUID')
+        if not user_uuid:
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
+            
+        # Delete chat session from database
+        async with request.ctx.session as session:
+            # Verify user exists
+            user = await UserDB.get_user_by_uuid(session, user_uuid)
+            if not user:
+                return json_response({"status": "error", "message": "User not found"}, status=404)
+                
+            # Verify session exists and belongs to user
+            chat_session = await ChatDB.get_session_by_uuid(session, session_id)
+            if not chat_session:
+                return json_response({"status": "error", "message": "Chat session not found"}, status=404)
+                
+            if chat_session.user_uuid != user_uuid:
+                return json_response({"status": "error", "message": "Unauthorized access to chat session"}, status=403)
+                
+            # Delete the session
+            success = await ChatDB.delete_session(session, session_id)
+            
+        if success:
+            return json_response({"status": "success", "message": "Chat session deleted successfully"})
+        else:
+            return json_response({"status": "error", "message": "Failed to delete chat session"}, status=500)
+    except Exception as e:
+        logger.error(f"Error deleting chat session: {str(e)}")
+        return json_response({"status": "error", "message": "Could not delete chat session"}, status=500)
+
+@app.route('/api/chat/sessions/<session_id>/messages', methods=['GET'])
+async def get_chat_messages(request, session_id):
+    """Get messages for a chat session."""
+    request_id = getattr(request.ctx, 'request_id', str(uuid.uuid4())[:8])
+    logger.info(f"[MSG:{request_id}] Starting get_chat_messages for session {session_id}")
+    
+    try:
+        # Get user UUID from header
+        user_uuid = request.headers.get('X-User-UUID')
+        if not user_uuid:
+            logger.warning(f"[MSG:{request_id}] Missing user UUID in headers: {dict(request.headers)}")
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
+            
+        logger.info(f"[MSG:{request_id}] Processing request for user {user_uuid[:8] if user_uuid else 'unknown'}...")
+        
+        # Get pagination parameters
+        limit = int(request.args.get('limit', 100))
+        offset = int(request.args.get('offset', 0))
+        logger.debug(f"[MSG:{request_id}] Pagination: limit={limit}, offset={offset}")
+        
+        # Get messages from database
+        async with request.ctx.session as session:
+            # Verify user exists
+            logger.info(f"[MSG:{request_id}] Verifying user {user_uuid[:8] if user_uuid else 'unknown'} exists")
+            user = await UserDB.get_user_by_uuid(session, user_uuid)
+            if not user:
+                logger.warning(f"[MSG:{request_id}] User {user_uuid[:8] if user_uuid else 'unknown'} not found in database")
+                return json_response({"status": "error", "message": "User not found"}, status=404)
+            
+            logger.info(f"[MSG:{request_id}] User {user_uuid[:8] if user_uuid else 'unknown'} found: {user.name if hasattr(user, 'name') else 'unnamed'}")
+                
+            # Verify session exists and belongs to user
+            logger.info(f"[MSG:{request_id}] Checking chat session {session_id}")
+            chat_session = await ChatDB.get_session_by_uuid(session, session_id)
+            
+            if not chat_session:
+                # Session does not exist, create it
+                logger.info(f"[MSG:{request_id}] Chat session {session_id} not found, creating new session")
+                chat_session = await ChatDB.create_session(session, user_uuid, session_id, "与20岁的自己对话")
+                
+                # Return empty messages array since it's a new session
+                logger.info(f"[MSG:{request_id}] Returning empty message list for new session")
+                return json_response({
+                    "status": "success",
+                    "data": []
+                })
+            
+            session_owner = chat_session.user_uuid if hasattr(chat_session, 'user_uuid') else 'unknown'
+            logger.info(f"[MSG:{request_id}] Session owner UUID: {session_owner[:8] if session_owner and session_owner != 'unknown' else 'unknown'}, requester UUID: {user_uuid[:8] if user_uuid else 'unknown'}")    
+            
+            if chat_session.user_uuid != user_uuid:
+                # If session belongs to another user
+                logger.warning(f"[MSG:{request_id}] Unauthorized access: session belongs to {session_owner[:8] if session_owner and session_owner != 'unknown' else 'unknown'}, not {user_uuid[:8] if user_uuid else 'unknown'}")
+                
+                # Check if this is a user-specific session ID that might have collided
+                if session_id.startswith('chat-') and len(session_id) > 5:
+                    # Generate a more unique ID for this user to avoid collisions
+                    new_session_id = f"chat-{user_uuid[:12]}-{str(uuid.uuid4())[:8]}"
+                    logger.info(f"[MSG:{request_id}] Suggesting new unique session ID: {new_session_id}")
+                    
+                    return json_response({
+                        "status": "error", 
+                        "message": "Unauthorized access to chat session",
+                        "new_session_id": new_session_id
+                    }, status=403)
+                else:
+                    # Standard permission denied
+                    return json_response({"status": "error", "message": "Unauthorized access to chat session"}, status=403)
+                
+            # Get the messages
+            logger.info(f"[MSG:{request_id}] Retrieving messages for session {session_id}")
+            messages = await ChatDB.get_messages_by_session(session, session_id, limit, offset)
+            logger.info(f"[MSG:{request_id}] Retrieved {len(messages)} messages")
+            
+        # Convert to dict
+        messages_data = [message.to_dict() for message in messages]
+        
+        logger.info(f"[MSG:{request_id}] Successfully completed get_chat_messages")
+        return json_response({
+            "status": "success",
+            "data": messages_data
+        })
+    except Exception as e:
+        logger.error(f"[MSG:{request_id}] Error getting chat messages: {str(e)}", exc_info=True)
+        return json_response({"status": "error", "message": "Could not retrieve chat messages"}, status=500)
+
+@app.route('/api/chat/sessions/<session_id>/messages', methods=['POST'])
+async def post_chat_message(request, session_id):
+    """Send a new chat message and get AI response via AJAX."""
+    request_id = getattr(request.ctx, 'request_id', str(uuid.uuid4())[:8])
+    
+    try:
+        # Get user UUID from header
+        user_uuid = request.headers.get('X-User-UUID')
+        if not user_uuid:
+            logger.warning(f"[AJAX:{request_id}] Missing user UUID in headers")
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
+            
+        # Get chat message from request
+        data = request.json
+        if not data:
+            logger.warning(f"[AJAX:{request_id}] Missing message data")
+            return json_response({"status": "error", "message": "Missing message data"}, status=400)
+            
+        user_message = data.get('message', '')
+        if not user_message:
+            logger.warning(f"[AJAX:{request_id}] Empty message")
+            return json_response({"status": "error", "message": "Empty message"}, status=400)
+            
+        # Log the request
+        client_id = request.headers.get('X-Client-ID', 'unknown')
+        logger.info(f"[AJAX:{request_id}] Processing chat message for session {session_id} from client {client_id}")
+        logger.info(f"[AJAX:{request_id}] User {user_uuid[:8] if user_uuid else 'unknown'} sending message: '{user_message[:30]}...' ({len(user_message)} chars)")
+        
+        # Generate UUIDs for the messages
+        user_message_uuid = str(uuid.uuid4())
+        ai_message_uuid = str(uuid.uuid4())
+        
+        # Process the message
+        async with async_session() as session:
+            # Verify user exists
+            logger.info(f"[AJAX:{request_id}] Verifying user {user_uuid[:8] if user_uuid else 'unknown'}")
+            user = await UserDB.get_user_by_uuid(session, user_uuid)
+            if not user:
+                logger.warning(f"[AJAX:{request_id}] User {user_uuid[:8] if user_uuid else 'unknown'} not found")
+                return json_response({"status": "error", "message": "User not found"}, status=404)
+                
+            # Get user data for personalization
+            user_data = user.to_dict()
+            logger.debug(f"[AJAX:{request_id}] Found user: {user.name if user.name else 'unnamed'}")
+            
+            # Check for chat session, create if doesn't exist
+            logger.info(f"[AJAX:{request_id}] Checking for chat session {session_id}")
+            chat_session = await ChatDB.get_session_by_uuid(session, session_id)
+            
+            # Handle session ownership
+            if chat_session:
+                if chat_session.user_uuid != user_uuid:
+                    # If session exists but belongs to another user, create a new session with a user-specific ID
+                    logger.warning(f"[AJAX:{request_id}] Session {session_id} belongs to user {chat_session.user_uuid[:8] if chat_session.user_uuid else 'unknown'}, not {user_uuid[:8] if user_uuid else 'unknown'}")
+                    
+                    # Check if the session ID follows our format pattern (chat-{uuid})
+                    if session_id.startswith('chat-') and len(session_id) > 5:
+                        # This appears to be a user-specific session ID with wrong permissions
+                        # Let's create a more unique session ID for this user
+                        new_session_id = f"chat-{user_uuid[:12]}-{str(uuid.uuid4())[:8]}"
+                        logger.info(f"[AJAX:{request_id}] Creating new unique session {new_session_id} for user {user_uuid[:8] if user_uuid else 'unknown'}")
+                        chat_session = await ChatDB.create_session(session, user_uuid, new_session_id, "与20岁的自己对话")
+                        
+                        # Return error with new session ID so client can update
+                        return json_response({
+                            "status": "error", 
+                            "message": "Session belongs to another user", 
+                            "new_session_id": new_session_id
+                        }, status=403)
+                    else:
+                        # Just create the session with the provided ID
+                        logger.info(f"[AJAX:{request_id}] Recreating session {session_id} for user {user_uuid[:8] if user_uuid else 'unknown'}")
+                        await ChatDB.delete_session(session, session_id)
+                        chat_session = await ChatDB.create_session(session, user_uuid, session_id, "与20岁的自己对话")
             else:
-                return json_response({"error": f"Invalid delete mode: {delete_mode}"}, status=400)
+                # Session doesn't exist, create it
+                logger.info(f"[AJAX:{request_id}] Creating new chat session {session_id}")
+                chat_session = await ChatDB.create_session(session, user_uuid, session_id, "与20岁的自己对话")
+                
+            # Store user message
+            logger.info(f"[AJAX:{request_id}] Storing user message")
+            await ChatDB.add_message(
+                session,
+                session_id,
+                user_message_uuid,
+                user_message,
+                is_user=True
+            )
             
-            return json_response({
-                "status": "success",
-                "message": message
-            })
-    except Exception as e:
-        logger.error(f"Error in delete_user: {str(e)}", exc_info=True)
-        return json_response({"error": str(e)}, status=500)
-
-@app.route('/api/admin/sessions', methods=['GET'])
-async def get_sessions(request):
-    """Get all chat sessions (admin only)."""
-    # Check admin token
-    admin_token = request.headers.get('X-Admin-Token')
-    if admin_token != "admin123":  # Hard-coded password for development only
-        return json_response({"error": "Unauthorized"}, status=401)
-    
-    try:
-        async with async_session() as session:
-            sessions = await ChatDB.get_all_sessions(session)
+            # Generate AI response
+            logger.info(f"[AJAX:{request_id}] Generating AI response")
+            start_time = datetime.datetime.now()
+            ai_response = await llm_response(user_message, user_data, session_id, session)
+            response_time = (datetime.datetime.now() - start_time).total_seconds()
+            logger.info(f"[AJAX:{request_id}] AI response generated in {response_time:.2f}s")
             
-            # For each session, count the number of messages
-            sessions_with_counts = []
-            for chat_session in sessions:
-                session_dict = chat_session.to_dict()
-                message_count = await ChatDB.count_messages_by_session(session, chat_session.session_uuid)
-                session_dict['message_count'] = message_count
-                sessions_with_counts.append(session_dict)
+            # Store AI response
+            logger.info(f"[AJAX:{request_id}] Storing AI response")
+            await ChatDB.add_message(
+                session,
+                session_id,
+                ai_message_uuid,
+                ai_response,
+                is_user=False
+            )
             
-            return json_response({
-                "status": "success",
-                "sessions": sessions_with_counts
-            })
+        # Return both messages
+        logger.info(f"[AJAX:{request_id}] Returning messages to client")
+        return json_response({
+            "status": "success",
+            "data": {
+                "user_message": {
+                    "uuid": user_message_uuid,
+                    "content": user_message,
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "is_user": True
+                },
+                "ai_response": {
+                    "uuid": ai_message_uuid,
+                    "content": ai_response,
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "is_user": False
+                }
+            }
+        })
     except Exception as e:
-        logger.error(f"Error in get_sessions: {str(e)}", exc_info=True)
-        return json_response({"error": str(e)}, status=500)
-
-@app.route('/api/admin/sessions/<session_id>', methods=['DELETE'])
-async def delete_session(request, session_id):
-    """Delete a chat session and all its messages (admin only)."""
-    # Check admin token
-    admin_token = request.headers.get('X-Admin-Token')
-    if admin_token != "admin123":  # Hard-coded password for development only
-        return json_response({"error": "Unauthorized"}, status=401)
-    
-    try:
-        async with async_session() as session:
-            await ChatDB.delete_session(session, session_id)
-            
-            return json_response({
-                "status": "success",
-                "message": f"Session {session_id} deleted successfully"
-            })
-    except Exception as e:
-        logger.error(f"Error in delete_session: {str(e)}", exc_info=True)
-        return json_response({"error": str(e)}, status=500)
-
-@app.route('/intro')
-async def intro(request):
-    """Render the intro animation page."""
-    try:
-        async with aiofiles.open(os.path.join(templates_folder, 'intro.html'), mode='r') as f:
-            content = await f.read()
-            return html(content)
-    except Exception as e:
-        logger.error(f"Error serving intro page: {str(e)}")
-        return html("<h1>Error loading page</h1><p>Please try again later.</p>")
-
-# Start the server if this file is run directly
-if __name__ == "__main__":
-    import sys
-    # Use default values if command line arguments are not provided
-    host = sys.argv[1] if len(sys.argv) > 1 else "0.0.0.0"
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8080
-    
-    app.run(
-        host=host, 
-        port=port, 
-        debug=True,
-        auto_reload=True
-    )
+        logger.error(f"[AJAX:{request_id}] Error processing chat message: {str(e)}", exc_info=True)
+        return json_response({"status": "error", "message": "Server error", "details": str(e)}, status=500)
 
 # Mock function for LLM API call
 async def mock_llm_response(user_message, user_data=None, session_id=None, db_session=None):
@@ -1130,6 +1215,7 @@ def generate_prompt_from_user_model(user_data, language="zh"):
     
     return prompt
 
+
 def create_system_prompt(user_data, language="zh"):
     """
     Create a system prompt based on user data.
@@ -1149,6 +1235,7 @@ def create_system_prompt(user_data, language="zh"):
     if language == "zh":
         return "你正在模拟与用户20岁时的自己进行对话。"
     return "You are simulating a conversation with a 20-year-old version of the user."
+
 
 async def deepseek_chat_completion(user_message, user_data=None, session_id=None, db_session=None):
     """
@@ -1278,6 +1365,7 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
         logger.warning(f"[API:{request_id}] Using mock response as fallback due to exception")
         return await mock_llm_response(user_message, user_data, session_id, db_session)
 
+
 async def llm_response(user_message, user_data=None, session_id=None, db_session=None):
     """
     Unified function for getting LLM responses - uses DeepSeek API or mock depending on configuration.
@@ -1299,3 +1387,176 @@ async def llm_response(user_message, user_data=None, session_id=None, db_session
     # Otherwise use DeepSeek API
     logger.info("Using DeepSeek API for response")
     return await deepseek_chat_completion(user_message, user_data, session_id, db_session)
+
+
+# WebSocket route for chat
+@app.websocket('/ws/chat/<session_id>')
+async def chat_socket(request, ws, session_id):
+    """WebSocket handler for real-time chat."""
+    message_count = 0
+    user_uuid = None
+    
+    try:
+        # Get user UUID from query parameters
+        user_uuid = request.args.get('user_uuid')
+        client_id = request.args.get('client_id', 'unknown')
+        
+        if not user_uuid:
+            logger.warning(f"Connection attempt without user UUID")
+            await ws.send(json.dumps({"status": "error", "message": "Missing user UUID"}))
+            await ws.close(1000, "Missing user UUID")
+            return
+            
+        logger.info(f"User {user_uuid[:8]}... connecting to session {session_id}")
+        
+        # Verify session exists and belongs to user
+        async with async_session() as session:
+            try:
+                # Get user data
+                user = await UserDB.get_user_by_uuid(session, user_uuid)
+                
+                if not user:
+                    logger.warning(f"User {user_uuid[:8]}... not found in database")
+                    await ws.send(json.dumps({"status": "error", "message": "User not found"}))
+                    await ws.close(1000, "User not found")
+                    return
+                
+                user_name = user.name if hasattr(user, 'name') and user.name else 'unnamed'
+                
+                # Check for chat session
+                chat_session = await ChatDB.get_session_by_uuid(session, session_id)
+                
+                if not chat_session:
+                    # Create a new session with the fixed ID if it doesn't exist
+                    chat_session = await ChatDB.create_session(session, user_uuid, session_id, "与20岁的自己对话")
+                elif chat_session.user_uuid != user_uuid:
+                    # If session exists but belongs to another user, create a new one for this user
+                    await ChatDB.delete_session(session, session_id)
+                    chat_session = await ChatDB.create_session(session, user_uuid, session_id, "与20岁的自己对话")
+            except Exception as e:
+                logger.error(f"Error setting up WebSocket session: {str(e)}", exc_info=True)
+                await ws.send(json.dumps({"status": "error", "message": "Error setting up chat session"}))
+                await ws.close(1000, "Error setting up chat session")
+                return
+        
+        # Send proper connection confirmation
+        await ws.send(json.dumps({
+            "status": "connected",
+            "message": "WebSocket connection established",
+            "session_id": session_id,
+            "user_name": user_name
+        }))
+        
+        # Main WebSocket loop
+        while True:
+            try:
+                # Wait for message from client
+                data = await ws.recv()
+                message_count += 1
+                
+                try:
+                    message_data = json.loads(data)
+                    
+                    # Handle ping/pong for keepalive
+                    if message_data.get('ping'):
+                        await ws.send(json.dumps({"pong": True, "timestamp": datetime.datetime.now().isoformat()}))
+                        continue
+                    
+                    user_message = message_data.get('message', '')
+                    
+                    if not user_message:
+                        await ws.send(json.dumps({"status": "error", "message": "Empty message"}))
+                        continue
+                    
+                    # Generate a UUID for the user message
+                    message_uuid = str(uuid.uuid4())
+                    
+                    # Process the message
+                    async with async_session() as db_session:
+                        try:
+                            # Get user data
+                            user = await UserDB.get_user_by_uuid(db_session, user_uuid)
+                            user_data = user.to_dict() if user else {}
+                            
+                            # Store the user message
+                            await ChatDB.add_message(
+                                db_session, 
+                                session_id, 
+                                message_uuid, 
+                                user_message,
+                                is_user=True
+                            )
+                            
+                            # Generate AI response
+                            ai_response = await llm_response(user_message, user_data, session_id, db_session)
+                            
+                            # Generate a UUID for the AI response
+                            ai_message_uuid = str(uuid.uuid4())
+                            
+                            # Save AI response to database
+                            await ChatDB.add_message(
+                                db_session, 
+                                session_id, 
+                                ai_message_uuid, 
+                                ai_response,
+                                is_user=False
+                            )
+                        except Exception as db_error:
+                            logger.error(f"Database error during message processing: {str(db_error)}", exc_info=True)
+                            await ws.send(json.dumps({"status": "error", "message": "Server error processing message"}))
+                            continue
+                    
+                    # Acknowledge receipt of message
+                    await ws.send(json.dumps({
+                        "status": "message_received",
+                        "message_id": message_uuid
+                    }))
+                    
+                    # Send AI response
+                    await ws.send(json.dumps({
+                        "status": "ai_response",
+                        "message_id": ai_message_uuid,
+                        "message": ai_response
+                    }))
+                    
+                except json.JSONDecodeError:
+                    logger.error(f"Invalid JSON in WebSocket message")
+                    await ws.send(json.dumps({"status": "error", "message": "Invalid JSON message"}))
+                except Exception as e:
+                    logger.error(f"Error in WebSocket message handling: {str(e)}", exc_info=True)
+                    await ws.send(json.dumps({"status": "error", "message": "Server error processing message"}))
+            except asyncio.CancelledError:
+                logger.warning(f"WebSocket connection cancelled")
+                break
+            except ConnectionResetError:
+                logger.warning(f"WebSocket connection reset by client")
+                break
+            except WebSocketProtocolError:
+                logger.warning(f"WebSocket protocol error")
+                break
+            except Exception as recv_error:
+                logger.error(f"WebSocket receive error: {str(recv_error)}", exc_info=True)
+                break
+    except Exception as e:
+        logger.error(f"Error in WebSocket handler: {str(e)}", exc_info=True)
+    finally:
+        try:
+            if ws:
+                await ws.close()
+                logger.info(f"WebSocket connection closed after {message_count} messages")
+        except Exception as close_error:
+            logger.warning(f"Error closing WebSocket: {str(close_error)}")
+
+# Start the server if this file is run directly
+if __name__ == "__main__":
+    import sys
+    # Use default values if command line arguments are not provided
+    host = sys.argv[1] if len(sys.argv) > 1 else "0.0.0.0"
+    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8080
+    
+    app.run(
+        host=host, 
+        port=port, 
+        debug=True,
+        auto_reload=True
+    )

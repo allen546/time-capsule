@@ -417,11 +417,11 @@
             </div>
             
             <div class="mood-selector">
-                <button class="mood-button" data-mood="happy">😊</button>
-                <button class="mood-button" data-mood="excited">🤗</button>
-                <button class="mood-button" data-mood="calm">😌</button>
-                <button class="mood-button" data-mood="sad">😢</button>
-                <button class="mood-button" data-mood="angry">😠</button>
+                <button class="mood-button" data-mood="happy" title="开心">😊</button>
+                <button class="mood-button" data-mood="excited" title="兴奋">🤗</button>
+                <button class="mood-button" data-mood="calm" title="平静">😌</button>
+                <button class="mood-button" data-mood="sad" title="悲伤">😢</button>
+                <button class="mood-button" data-mood="angry" title="生气">😠</button>
             </div>
             
             <textarea class="activity-input" id="activity-input" placeholder="今天发生了什么有趣的事情呢？" rows="3"></textarea>
@@ -476,6 +476,25 @@
         document.getElementById('back-button').addEventListener('click', function() {
             window.location.href = '/';
         });
+        
+        // 处理URL参数，预选择心情
+        function handleUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const moodParam = urlParams.get('mood');
+            
+            if (moodParam) {
+                const moodButtons = document.querySelectorAll('.mood-button');
+                moodButtons.forEach(button => {
+                    // 如果数据属性匹配URL的心情参数或翻译匹配
+                    if (button.dataset.mood === moodParam) {
+                        button.click(); // 自动点击该按钮
+                    }
+                });
+            }
+        }
+        
+        // 页面加载时处理URL参数
+        window.addEventListener('load', handleUrlParams);
         
         // 心情选择
         let selectedMood = null;
@@ -660,9 +679,32 @@
                         'sad': '😢',
                         'angry': '😠',
                         'calm': '😌',
-                        'excited': '🤗'
+                        'excited': '🤗',
+                        // 支持中文心情参数
+                        '喜': '😄',
+                        '怒': '😠',
+                        '哀': '😢',
+                        '思': '🤔',
+                        '乐': '😊'
                     };
+                    
+                    // 心情英文转中文
+                    const moodTranslations = {
+                        'happy': '开心',
+                        'sad': '悲伤',
+                        'angry': '生气',
+                        'calm': '平静',
+                        'excited': '兴奋',
+                        // 保持中文心情参数不变
+                        '喜': '喜',
+                        '怒': '怒',
+                        '哀': '哀',
+                        '思': '思',
+                        '乐': '乐'
+                    };
+                    
                     const moodIcon = moodIcons[entry.mood] || moodIcons.calm;
+                    const moodText = moodTranslations[entry.mood] || '平静';
                     
                     diaryItem.innerHTML = `
                         <div class="diary-date">
@@ -671,7 +713,7 @@
                         <div class="diary-content">${entry.content}</div>
                         <div class="diary-meta">
                             <div class="diary-mood">
-                                <span class="mood-icon">${moodIcon}</span>${entry.mood || '平静'}
+                                <span class="mood-icon">${moodIcon}</span>${moodText}
                             </div>
                         </div>
                     `;

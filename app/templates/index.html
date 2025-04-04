@@ -141,9 +141,10 @@
         }
         
         .button-container {
+            margin-top: 20px;
             display: flex;
             gap: 12px;
-            margin-top: 20px;
+            justify-content: center;
         }
         
         .button {
@@ -348,16 +349,41 @@
                     <button class="button" id="start-chat">
                         <span class="icon">💬</span>开始对话
                     </button>
+                    <button class="button" id="profile-button">
+                        <span class="icon">👤</span>个人资料
+                    </button>
                 </div>
             </div>
             
             <div class="card" id="card-diary">
-                <div class="card-title">每日心情</div>
-                <p class="card-description">记录每一天的心情和故事，让生活更有温度。</p>
+                <div class="card-title">心情日记</div>
+                <p class="card-description">记录生活中的喜怒哀乐，留下珍贵的情感印记。</p>
                 <div class="button-container">
                     <button class="button" id="diary-button">
-                        <span class="icon">📝</span>今天的心情怎么样？
+                        <span class="icon">📝</span>写日记
                     </button>
+                </div>
+                <div class="emotions-container">
+                    <div class="emotion-icon" data-mood="喜">
+                        <span title="喜">😄</span>
+                        <span class="emotion-label">喜</span>
+                    </div>
+                    <div class="emotion-icon" data-mood="怒">
+                        <span title="怒">😠</span>
+                        <span class="emotion-label">怒</span>
+                    </div>
+                    <div class="emotion-icon" data-mood="哀">
+                        <span title="哀">😢</span>
+                        <span class="emotion-label">哀</span>
+                    </div>
+                    <div class="emotion-icon" data-mood="思">
+                        <span title="思">🤔</span>
+                        <span class="emotion-label">思</span>
+                    </div>
+                    <div class="emotion-icon" data-mood="乐">
+                        <span title="乐">😊</span>
+                        <span class="emotion-label">乐</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -402,12 +428,16 @@
             window.location.href = '/chat';
         });
         
+        document.getElementById('profile-button').addEventListener('click', function() {
+            window.location.href = '/profile';
+        });
+        
         document.getElementById('diary-button').addEventListener('click', function() {
             window.location.href = '/diary';
         });
         
         document.getElementById('card-diary').addEventListener('click', function(e) {
-            if (e.target.tagName !== 'BUTTON') {
+            if (e.target.tagName !== 'BUTTON' && !e.target.classList.contains('emotion-icon') && e.target.parentElement.tagName !== 'BUTTON') {
                 window.location.href = '/diary';
             }
         });
@@ -496,6 +526,14 @@
         
         // 页面加载时应用保存的设置
         window.addEventListener('load', loadSettings);
+        
+        // 添加情绪图标点击事件
+        document.querySelectorAll('.emotion-icon').forEach(icon => {
+            icon.addEventListener('click', function() {
+                const mood = this.getAttribute('data-mood');
+                window.location.href = `/diary?mood=${mood}`;
+            });
+        });
     </script>
 </body>
 </html> 

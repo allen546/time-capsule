@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时间胶囊 - 管理面板</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #FF7043;
+            --secondary-color: #FFA726;
+            --background-color: #FFF8E1;
+            --card-color: #FFFFFF;
+            --text-color: #3E2723;
+            --text-secondary: #8D6E63;
+            --border-radius: 18px;
+            --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+            --danger-color: #F44336;
+            --font-size-base: 16px;
+            --font-size-large: 18px;
+            --font-size-xlarge: 20px;
+            --font-size-xxlarge: 24px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Icons', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.5;
+            font-size: var(--font-size-base);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--text-secondary);
+        }
+        
+        .title {
+            font-size: var(--font-size-xxlarge);
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        
+        .back-button {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            border: 1px solid var(--text-secondary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: var(--font-size-base);
+        }
+        
+        .back-button:hover {
+            background-color: var(--card-color);
+        }
+        
+        .login-container, .admin-container {
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--text-secondary);
+            border-radius: 8px;
+            font-size: var(--font-size-base);
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-size: var(--font-size-base);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #F4511E;
+        }
+        
+        .error-message {
+            color: var(--danger-color);
+            margin-top: 15px;
+            font-weight: 500;
+        }
+        
+        .section-title {
+            font-size: var(--font-size-xlarge);
+            margin: 20px 0 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        
+        .data-table th, .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .data-table th {
+            font-weight: 600;
+            background-color: rgba(0,0,0,0.03);
+        }
+        
+        .data-table tbody tr:hover {
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .delete-btn {
+            background-color: var(--danger-color);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .delete-btn:hover {
+            background-color: #D32F2F;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .alert-danger {
+            background-color: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            color: var(--danger-color);
+        }
+        
+        .alert-success {
+            background-color: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #4CAF50;
+        }
+        
+        .delete-options {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--card-color);
+            min-width: 120px;
+            box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+            z-index: 1;
+            border-radius: 4px;
+            right: 0;
+        }
+        
+        .delete-options:hover .dropdown-content {
+            display: block;
+        }
+        
+        .dropdown-content button {
+            width: 100%;
+            padding: 8px 16px;
+            text-align: left;
+            background-color: transparent;
+            color: var(--text-color);
+            border: none;
+            border-radius: 0;
+        }
+        
+        .dropdown-content button:hover {
+            background-color: rgba(0,0,0,0.05);
+            color: var(--danger-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">管理面板</h1>
+            <button class="back-button" id="backButton">
+                <i class="fas fa-arrow-left"></i> 返回首页
+            </button>
+        </div>
+        
+        <!-- 登录表单 -->
+        <div id="loginContainer" class="login-container">
+            <h2 class="section-title">管理员登录</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" placeholder="请输入管理员密码">
+                </div>
+                <button type="submit">登录</button>
+                <div id="errorMessage" class="error-message hidden"></div>
+            </form>
+        </div>
+        
+        <!-- 管理内容 -->
+        <div id="adminContainer" class="admin-container hidden">
+            <div id="alertContainer" class="hidden"></div>
+            
+            <!-- 用户管理 -->
+            <h2 class="section-title">用户管理</h2>
+            <div id="usersLoading">加载中...</div>
+            <table id="usersTable" class="data-table hidden">
+                <thead>
+                    <tr>
+                        <th>UUID</th>
+                        <th>名称</th>
+                        <th>年龄</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody"></tbody>
+            </table>
+            
+            <!-- 会话历史管理 -->
+            <h2 class="section-title">会话历史</h2>
+            <div id="sessionsLoading">加载中...</div>
+            <table id="sessionsTable" class="data-table hidden">
+                <thead>
+                    <tr>
+                        <th>会话ID</th>
+                        <th>用户ID</th>
+                        <th>消息数量</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="sessionsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        // 硬编码密码 (仅用于开发环境)
+        const ADMIN_PASSWORD = "admin123"; 
+        
+        document.getElementById('backButton').addEventListener('click', function() {
+            window.location.href = '/';
+        });
+        
+        // 登录表单提交
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const password = document.getElementById('password').value;
+            
+            if (password === ADMIN_PASSWORD) {
+                // 登录成功，显示管理面板
+                document.getElementById('loginContainer').classList.add('hidden');
+                document.getElementById('adminContainer').classList.remove('hidden');
+                
+                // 加载数据
+                loadUsers();
+                loadSessions();
+            } else {
+                // 登录失败，显示错误信息
+                const errorElement = document.getElementById('errorMessage');
+                errorElement.textContent = "密码错误";
+                errorElement.classList.remove('hidden');
+            }
+        });
+        
+        // 显示提示消息
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            alertContainer.className = `alert alert-${type}`;
+            alertContainer.textContent = message;
+            alertContainer.classList.remove('hidden');
+            
+            // 5秒后自动隐藏
+            setTimeout(() => {
+                alertContainer.classList.add('hidden');
+            }, 5000);
+        }
+        
+        // 加载用户列表
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users', {
+                    headers: {
+                        'X-Admin-Token': ADMIN_PASSWORD
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('加载用户数据失败');
+                }
+                
+                const data = await response.json();
+                
+                document.getElementById('usersLoading').classList.add('hidden');
+                document.getElementById('usersTable').classList.remove('hidden');
+                
+                const tableBody = document.getElementById('usersTableBody');
+                tableBody.innerHTML = '';
+                
+                data.users.forEach(user => {
+                    const row = document.createElement('tr');
+                    
+                    // 截断UUID以适应表格
+                    const shortUuid = user.uuid.substring(0, 8) + '...';
+                    
+                    row.innerHTML = `
+                        <td title="${user.uuid}">${shortUuid}</td>
+                        <td>${user.name || '未命名'}</td>
+                        <td>${user.age || '未知'}</td>
+                        <td>${new Date(user.created_at).toLocaleString()}</td>
+                        <td>
+                            <div class="delete-options">
+                                <button class="delete-btn" data-uuid="${user.uuid}" data-mode="all">删除用户</button>
+                                <div class="dropdown-content">
+                                    <button class="delete-btn" data-uuid="${user.uuid}" data-mode="chats">清空聊天</button>
+                                    <button class="delete-btn" data-uuid="${user.uuid}" data-mode="diary">清空日记</button>
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                });
+                
+                // 添加删除事件监听
+                document.querySelectorAll('.delete-btn[data-uuid]').forEach(button => {
+                    button.addEventListener('click', async function() {
+                        const uuid = this.getAttribute('data-uuid');
+                        const mode = this.getAttribute('data-mode') || 'all';
+                        
+                        let confirmMessage = '';
+                        if (mode === 'all') {
+                            confirmMessage = `确认删除用户 ${uuid} 及其所有数据吗？此操作不可撤销。`;
+                        } else if (mode === 'chats') {
+                            confirmMessage = `确认清空用户 ${uuid} 的所有聊天记录吗？此操作不可撤销。`;
+                        } else if (mode === 'diary') {
+                            confirmMessage = `确认清空用户 ${uuid} 的所有日记吗？此操作不可撤销。`;
+                        }
+                        
+                        if (confirm(confirmMessage)) {
+                            await deleteUser(uuid, mode);
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('加载用户数据错误:', error);
+                showAlert('加载用户数据失败: ' + error.message, 'danger');
+            }
+        }
+        
+        // 加载会话列表
+        async function loadSessions() {
+            try {
+                const response = await fetch('/api/admin/sessions', {
+                    headers: {
+                        'X-Admin-Token': ADMIN_PASSWORD
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('加载会话数据失败');
+                }
+                
+                const data = await response.json();
+                
+                document.getElementById('sessionsLoading').classList.add('hidden');
+                document.getElementById('sessionsTable').classList.remove('hidden');
+                
+                const tableBody = document.getElementById('sessionsTableBody');
+                tableBody.innerHTML = '';
+                
+                data.sessions.forEach(session => {
+                    const row = document.createElement('tr');
+                    
+                    // 截断ID以适应表格
+                    const shortSessionId = session.id.substring(0, 8) + '...';
+                    const shortUserId = session.user_uuid.substring(0, 8) + '...';
+                    
+                    row.innerHTML = `
+                        <td title="${session.id}">${shortSessionId}</td>
+                        <td title="${session.user_uuid}">${shortUserId}</td>
+                        <td>${session.message_count || 0}</td>
+                        <td>${new Date(session.created_at).toLocaleString()}</td>
+                        <td>
+                            <button class="delete-btn" data-session="${session.id}">删除</button>
+                        </td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                });
+                
+                // 添加删除事件监听
+                document.querySelectorAll('.delete-btn[data-session]').forEach(button => {
+                    button.addEventListener('click', async function() {
+                        const sessionId = this.getAttribute('data-session');
+                        if (confirm(`确认删除会话 ${sessionId} 吗？此操作不可撤销。`)) {
+                            await deleteSession(sessionId);
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('加载会话数据错误:', error);
+                showAlert('加载会话数据失败: ' + error.message, 'danger');
+            }
+        }
+        
+        // 删除用户
+        async function deleteUser(uuid, mode = 'all') {
+            try {
+                const response = await fetch(`/api/admin/users/${uuid}?mode=${mode}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-Admin-Token': ADMIN_PASSWORD
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('删除用户失败');
+                }
+                
+                showAlert('用户删除成功', 'success');
+                
+                // 重新加载用户列表
+                loadUsers();
+                // 重新加载会话列表（因为可能有级联删除）
+                loadSessions();
+            } catch (error) {
+                console.error('删除用户错误:', error);
+                showAlert('删除用户失败: ' + error.message, 'danger');
+            }
+        }
+        
+        // 删除会话
+        async function deleteSession(sessionId) {
+            try {
+                const response = await fetch(`/api/admin/sessions/${sessionId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-Admin-Token': ADMIN_PASSWORD
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('删除会话失败');
+                }
+                
+                showAlert('会话删除成功', 'success');
+                
+                // 重新加载会话列表
+                loadSessions();
+            } catch (error) {
+                console.error('删除会话错误:', error);
+                showAlert('删除会话失败: ' + error.message, 'danger');
+            }
+        }
+    </script>
+</body>
+</html> 
