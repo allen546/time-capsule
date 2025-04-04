@@ -89,7 +89,8 @@ function initDeviceId() {
 
 /**
  * Font size control functionality
- * Allows users to increase or decrease text size
+ * Allows users to increase or decrease text size with multiple levels
+ * Shows current level (1-5) on center button
  */
 function initFontSizeControls() {
     const decreaseBtn = document.getElementById('decreaseFontBtn');
@@ -98,9 +99,14 @@ function initFontSizeControls() {
     
     if (!decreaseBtn || !normalBtn || !increaseBtn) return;
     
+    // Define size levels from smallest to largest
+    const sizeLevels = ['x-small', 'small', 'normal', 'large', 'x-large'];
+    
     // Function to remove all font size classes
     function removeAllFontSizeClasses() {
-        document.body.classList.remove('font-size-large', 'font-size-x-large');
+        sizeLevels.forEach(size => {
+            document.body.classList.remove(`font-size-${size}`);
+        });
         
         // Reset active state on buttons
         decreaseBtn.classList.remove('active');
@@ -108,46 +114,64 @@ function initFontSizeControls() {
         increaseBtn.classList.remove('active');
     }
     
-    // Default text size
+    // Get current size level index
+    function getCurrentSizeIndex() {
+        const currentSize = localStorage.getItem('fontSizePreference') || 'normal';
+        return sizeLevels.indexOf(currentSize);
+    }
+    
+    // Update center button text to show current level (1-5)
+    function updateCenterButtonText(index) {
+        // Convert 0-4 index to 1-5 display level
+        const displayLevel = index + 1;
+        normalBtn.textContent = displayLevel.toString();
+    }
+    
+    // Apply size by index
+    function applySizeByIndex(index) {
+        // Ensure index is within bounds
+        index = Math.max(0, Math.min(index, sizeLevels.length - 1));
+        
+        const size = sizeLevels[index];
+        removeAllFontSizeClasses();
+        document.body.classList.add(`font-size-${size}`);
+        localStorage.setItem('fontSizePreference', size);
+        
+        // Update center button text
+        updateCenterButtonText(index);
+        
+        // Update active button
+        if (index === 2) { // normal is at index 2
+            normalBtn.classList.add('active');
+        } else if (index > 2) {
+            increaseBtn.classList.add('active');
+        } else {
+            decreaseBtn.classList.add('active');
+        }
+        
+        return index;
+    }
+    
+    // Normal size (level 3)
     normalBtn.addEventListener('click', function() {
-        removeAllFontSizeClasses();
-        normalBtn.classList.add('active');
-        
-        // Save preference
-        localStorage.setItem('fontSizePreference', 'normal');
+        applySizeByIndex(2); // "normal" is at index 2
     });
     
-    // Large text size
+    // Increase size
     increaseBtn.addEventListener('click', function() {
-        removeAllFontSizeClasses();
-        document.body.classList.add('font-size-large');
-        increaseBtn.classList.add('active');
-        
-        // Save preference
-        localStorage.setItem('fontSizePreference', 'large');
+        const currentIndex = getCurrentSizeIndex();
+        applySizeByIndex(currentIndex + 1);
     });
     
-    // Smaller text size (but still larger than typical websites)
+    // Decrease size
     decreaseBtn.addEventListener('click', function() {
-        removeAllFontSizeClasses();
-        document.body.classList.add('font-size-x-large');
-        decreaseBtn.classList.add('active');
-        
-        // Save preference
-        localStorage.setItem('fontSizePreference', 'x-large');
+        const currentIndex = getCurrentSizeIndex();
+        applySizeByIndex(currentIndex - 1);
     });
     
     // Apply saved font size preference
-    const savedFontSize = localStorage.getItem('fontSizePreference');
-    if (savedFontSize === 'large') {
-        document.body.classList.add('font-size-large');
-        increaseBtn.classList.add('active');
-    } else if (savedFontSize === 'x-large') {
-        document.body.classList.add('font-size-x-large');
-        decreaseBtn.classList.add('active');
-    } else {
-        normalBtn.classList.add('active');
-    }
+    const savedSize = localStorage.getItem('fontSizePreference') || 'normal';
+    applySizeByIndex(sizeLevels.indexOf(savedSize));
 }
 
 /**

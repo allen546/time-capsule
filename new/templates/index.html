@@ -36,7 +36,7 @@
                 <div class="font-controls">
                     <span class="me-2">文字大小:</span>
                     <button id="decreaseFontBtn" class="btn-font" aria-label="减小文字大小">A-</button>
-                    <button id="normalFontBtn" class="btn-font active" aria-label="正常文字大小">A</button>
+                    <button id="normalFontBtn" class="btn-font active" aria-label="文字大小级别">3</button>
                     <button id="increaseFontBtn" class="btn-font" aria-label="增大文字大小">A+</button>
                 </div>
                 <div class="contrast-toggle ms-4">
@@ -61,9 +61,6 @@
                     <ul class="navbar-nav ms-auto">
                         <li class="nav-item">
                             <a class="nav-link active" href="/"><i class="fas fa-home me-1"></i> 首页</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#"><i class="fas fa-clipboard-list me-1"></i> 问卷调查</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="#"><i class="fas fa-comments me-1"></i> 我的对话</a>
@@ -118,11 +115,11 @@
                     <div class="col-md-4">
                         <div class="feature-card">
                             <div class="feature-icon">
-                                <i class="fas fa-clipboard-list"></i>
+                                <i class="fas fa-user-edit"></i>
                             </div>
-                            <h3 class="feature-title">第一步: 完成问卷</h3>
-                            <p class="feature-text">填写关于您20岁时的详细问卷，包括生活、学习、工作和梦想。</p>
-                            <a href="#" class="btn btn-feature">开始填写问卷</a>
+                            <h3 class="feature-title">第一步: 设置个人资料</h3>
+                            <p class="feature-text">输入您的基本信息，让我们更好地了解您，为您提供个性化的体验。</p>
+                            <a href="/profile" class="btn btn-feature">设置个人资料</a>
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -131,7 +128,7 @@
                                 <i class="fas fa-robot"></i>
                             </div>
                             <h3 class="feature-title">第二步: 系统学习</h3>
-                            <p class="feature-text">我们的AI系统会学习您的经历和性格，创建您20岁时的个性模型。</p>
+                            <p class="feature-text">我们的AI系统会根据您的特点，创建您20岁时的个性模型。</p>
                             <button class="btn btn-feature" disabled>系统自动处理</button>
                         </div>
                     </div>
@@ -195,7 +192,6 @@
                     <h3 class="footer-subtitle">快速链接</h3>
                     <ul class="footer-links">
                         <li><a href="/">首页</a></li>
-                        <li><a href="#">问卷调查</a></li>
                         <li><a href="#">我的对话</a></li>
                         <li><a href="/profile">个人资料</a></li>
                     </ul>

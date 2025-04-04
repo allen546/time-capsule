@@ -710,14 +710,6 @@ hr {
 
 /* Responsive styles */
 @media (max-width: 992px) {
-    :root {
-        --font-size-base: 16px;
-        --font-size-lg: 18px;
-        --font-size-xl: 20px;
-        --font-size-xxl: 24px;
-        --font-size-header: 28px;
-    }
-    
     .hero {
         padding: 3rem 0;
     }
