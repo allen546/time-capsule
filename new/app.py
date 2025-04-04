@@ -74,6 +74,13 @@ async def profile(request):
         content = await f.read()
     return html(content)
 
+@app.route('/diary')
+async def diary(request):
+    """Serve the diary page."""
+    async with aiofiles.open(os.path.join(templates_folder, 'diary.html'), mode='r') as f:
+        content = await f.read()
+    return html(content)
+
 @app.route('/health')
 async def health_check(request):
     return text("OK")
@@ -228,6 +235,206 @@ async def reset_device(request):
         return json_response({"status": "success", "message": "Device reset completed"})
     except Exception as e:
         logger.error(f"Error handling device reset: {str(e)}", exc_info=True)
+        return json_response({"status": "error", "message": "Server error"}, status=500)
+
+# Diary API endpoints
+@app.route('/api/diary/entries', methods=['GET'])
+async def get_diary_entries(request):
+    """Get all diary entries for a user."""
+    try:
+        # Get user UUID from header
+        user_uuid = request.headers.get('X-User-UUID')
+        if not user_uuid:
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
+        
+        # Get diary file path
+        diary_file = os.path.join(data_folder, f'diary_{user_uuid}.json')
+        
+        # If file doesn't exist, return empty array
+        if not os.path.exists(diary_file):
+            return json_response({"status": "success", "data": []})
+        
+        # Read diary entries
+        async with aiofiles.open(diary_file, mode='r') as f:
+            content = await f.read()
+            entries = json.loads(content) if content else []
+        
+        # Sort by pinned status and then by date (newest first)
+        sorted_entries = sorted(entries, key=lambda x: (not x.get('pinned', False), x.get('date', ''), x.get('created_at', '')), reverse=True)
+        
+        return json_response({
+            "status": "success",
+            "data": sorted_entries
+        })
+    except Exception as e:
+        logger.error(f"Error retrieving diary entries: {str(e)}", exc_info=True)
+        return json_response({"status": "error", "message": "Server error"}, status=500)
+
+@app.route('/api/diary/entries', methods=['POST'])
+async def create_diary_entry(request):
+    """Create a new diary entry."""
+    try:
+        # Get user UUID from header
+        user_uuid = request.headers.get('X-User-UUID')
+        if not user_uuid:
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
+        
+        # Get diary entry data
+        data = request.json
+        if not data:
+            return json_response({"status": "error", "message": "Missing diary entry data"}, status=400)
+        
+        # Validate required fields
+        title = data.get('title')
+        content = data.get('content')
+        date = data.get('date')
+        
+        if not title or not isinstance(title, str):
+            return json_response({"status": "error", "message": "Invalid title"}, status=400)
+        
+        if not content or not isinstance(content, str):
+            return json_response({"status": "error", "message": "Invalid content"}, status=400)
+        
+        if not date or not isinstance(date, str):
+            return json_response({"status": "error", "message": "Invalid date"}, status=400)
+        
+        # Get diary file path
+        diary_file = os.path.join(data_folder, f'diary_{user_uuid}.json')
+        
+        # Read existing entries or create empty array
+        entries = []
+        if os.path.exists(diary_file):
+            async with aiofiles.open(diary_file, mode='r') as f:
+                content = await f.read()
+                entries = json.loads(content) if content else []
+        
+        # Create new entry with ID
+        entry_id = str(uuid.uuid4())
+        new_entry = {
+            "id": entry_id,
+            "title": title,
+            "content": content,
+            "date": date,
+            "mood": data.get('mood', 'calm'),
+            "pinned": data.get('pinned', False),
+            "created_at": str(datetime.datetime.now()),
+            "updated_at": str(datetime.datetime.now())
+        }
+        
+        # Add new entry
+        entries.append(new_entry)
+        
+        # Save updated entries
+        async with aiofiles.open(diary_file, mode='w') as f:
+            await f.write(json.dumps(entries, indent=2))
+        
+        # Return the new entry
+        return json_response({
+            "status": "success",
+            "message": "Diary entry created successfully",
+            "data": new_entry
+        })
+    except Exception as e:
+        logger.error(f"Error creating diary entry: {str(e)}", exc_info=True)
+        return json_response({"status": "error", "message": "Server error"}, status=500)
+
+@app.route('/api/diary/entries/<entry_id>', methods=['PUT'])
+async def update_diary_entry(request, entry_id):
+    """Update an existing diary entry."""
+    try:
+        # Get user UUID from header
+        user_uuid = request.headers.get('X-User-UUID')
+        if not user_uuid:
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
+        
+        # Get diary entry data
+        data = request.json
+        if not data:
+            return json_response({"status": "error", "message": "Missing diary entry data"}, status=400)
+        
+        # Get diary file path
+        diary_file = os.path.join(data_folder, f'diary_{user_uuid}.json')
+        
+        # Check if diary file exists
+        if not os.path.exists(diary_file):
+            return json_response({"status": "error", "message": "Diary entry not found"}, status=404)
+        
+        # Read existing entries
+        async with aiofiles.open(diary_file, mode='r') as f:
+            content = await f.read()
+            entries = json.loads(content) if content else []
+        
+        # Find entry by ID
+        entry_index = None
+        for i, entry in enumerate(entries):
+            if entry.get('id') == entry_id:
+                entry_index = i
+                break
+        
+        # Return error if entry not found
+        if entry_index is None:
+            return json_response({"status": "error", "message": "Diary entry not found"}, status=404)
+        
+        # Update entry fields
+        entries[entry_index]['title'] = data.get('title', entries[entry_index]['title'])
+        entries[entry_index]['content'] = data.get('content', entries[entry_index]['content'])
+        entries[entry_index]['date'] = data.get('date', entries[entry_index]['date'])
+        entries[entry_index]['mood'] = data.get('mood', entries[entry_index]['mood'])
+        entries[entry_index]['pinned'] = data.get('pinned', entries[entry_index]['pinned'])
+        entries[entry_index]['updated_at'] = str(datetime.datetime.now())
+        
+        # Save updated entries
+        async with aiofiles.open(diary_file, mode='w') as f:
+            await f.write(json.dumps(entries, indent=2))
+        
+        # Return the updated entry
+        return json_response({
+            "status": "success",
+            "message": "Diary entry updated successfully",
+            "data": entries[entry_index]
+        })
+    except Exception as e:
+        logger.error(f"Error updating diary entry: {str(e)}", exc_info=True)
+        return json_response({"status": "error", "message": "Server error"}, status=500)
+
+@app.route('/api/diary/entries/<entry_id>', methods=['DELETE'])
+async def delete_diary_entry(request, entry_id):
+    """Delete a diary entry."""
+    try:
+        # Get user UUID from header
+        user_uuid = request.headers.get('X-User-UUID')
+        if not user_uuid:
+            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
+        
+        # Get diary file path
+        diary_file = os.path.join(data_folder, f'diary_{user_uuid}.json')
+        
+        # Check if diary file exists
+        if not os.path.exists(diary_file):
+            return json_response({"status": "error", "message": "Diary entry not found"}, status=404)
+        
+        # Read existing entries
+        async with aiofiles.open(diary_file, mode='r') as f:
+            content = await f.read()
+            entries = json.loads(content) if content else []
+        
+        # Find and remove entry by ID
+        new_entries = [entry for entry in entries if entry.get('id') != entry_id]
+        
+        # Return error if entry not found (length didn't change)
+        if len(new_entries) == len(entries):
+            return json_response({"status": "error", "message": "Diary entry not found"}, status=404)
+        
+        # Save updated entries
+        async with aiofiles.open(diary_file, mode='w') as f:
+            await f.write(json.dumps(new_entries, indent=2))
+        
+        return json_response({
+            "status": "success",
+            "message": "Diary entry deleted successfully"
+        })
+    except Exception as e:
+        logger.error(f"Error deleting diary entry: {str(e)}", exc_info=True)
         return json_response({"status": "error", "message": "Server error"}, status=500)
 
 if __name__ == "__main__":

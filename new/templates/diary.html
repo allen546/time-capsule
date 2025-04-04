@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日记 - 时光胶囊</title>
+    
+    <!-- Prevent caching in development -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    
+    <!-- Accessibility meta tags -->
+    <meta name="description" content="记录您的日记和回忆 - 时光胶囊">
+</head>
+<body>
+    <!-- Accessibility skip link -->
+    <a href="#main-content" class="skip-link">跳到主要内容</a>
+    
+    <!-- Header with accessibility controls -->
+    <header>
+        <div class="accessibility-bar">
+            <div class="container d-flex justify-content-end">
+                <div class="font-controls">
+                    <span class="me-2">文字大小:</span>
+                    <button id="decreaseFontBtn" class="btn-font" aria-label="减小文字大小">A-</button>
+                    <button id="normalFontBtn" class="btn-font active" aria-label="文字大小级别">3</button>
+                    <button id="increaseFontBtn" class="btn-font" aria-label="增大文字大小">A+</button>
+                </div>
+                <div class="contrast-toggle ms-4">
+                    <label for="highContrastToggle" class="form-check-label me-2">高对比度:</label>
+                    <input type="checkbox" id="highContrastToggle" class="form-check-input">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main navigation -->
+        <nav class="navbar navbar-expand-lg">
+            <div class="container">
+                <a class="navbar-brand" href="/">
+                    <i class="fas fa-hourglass-half me-2"></i>
+                    <span class="brand-text">时光胶囊</span>
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" 
+                        aria-controls="mainNav" aria-expanded="false" aria-label="切换导航">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/"><i class="fas fa-home me-1"></i> 首页</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/diary"><i class="fas fa-book me-1"></i> 日记</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"><i class="fas fa-comments me-1"></i> 我的对话</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/profile"><i class="fas fa-user me-1"></i> 个人资料</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main content -->
+    <main id="main-content" class="py-5">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-10">
+                    <!-- Success Alert -->
+                    <div id="diarySuccessAlert" class="alert alert-success alert-dismissible fade show d-none" role="alert">
+                        <i class="fas fa-check-circle me-2"></i> <span id="successAlertMessage">操作成功！</span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>
+                    </div>
+                    
+                    <div class="diary-header mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h1 class="diary-title"><i class="fas fa-book me-2"></i> 我的日记</h1>
+                            <button id="newDiaryBtn" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i> 新建日记
+                            </button>
+                        </div>
+                        <p class="text-muted">在这里记录您的想法、回忆和生活点滴</p>
+                    </div>
+                    
+                    <!-- Empty state (shown when no entries exist) -->
+                    <div id="emptyDiaryState" class="text-center py-5 my-4 bg-light rounded d-none">
+                        <div class="py-4">
+                            <i class="fas fa-book-open fa-4x text-muted mb-3"></i>
+                            <h3>还没有日记</h3>
+                            <p class="text-muted">点击"新建日记"按钮开始记录您的想法和回忆</p>
+                            <button id="emptyStateNewBtn" class="btn btn-primary mt-3">
+                                <i class="fas fa-plus me-2"></i> 创建第一篇日记
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Diary entries list -->
+                    <div id="diaryEntriesList">
+                        <!-- Entries will be dynamically inserted here -->
+                    </div>
+                    
+                    <!-- Pagination controls (if needed) -->
+                    <nav aria-label="日记分页" class="mt-4 d-none" id="diaryPagination">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item disabled">
+                                <a class="page-link" href="#" tabindex="-1" aria-disabled="true">上一页</a>
+                            </li>
+                            <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                            <li class="page-item"><a class="page-link" href="#">2</a></li>
+                            <li class="page-item"><a class="page-link" href="#">3</a></li>
+                            <li class="page-item">
+                                <a class="page-link" href="#">下一页</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 mb-4 mb-md-0">
+                    <h2 class="footer-title">时光胶囊</h2>
+                    <p class="footer-text">与20岁的自己对话，重温青春记忆。</p>
+                </div>
+                <div class="col-md-4 mb-4 mb-md-0">
+                    <h3 class="footer-subtitle">快速链接</h3>
+                    <ul class="footer-links">
+                        <li><a href="/">首页</a></li>
+                        <li><a href="/diary">日记</a></li>
+                        <li><a href="#">我的对话</a></li>
+                        <li><a href="/profile">个人资料</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h3 class="footer-subtitle">联系我们</h3>
+                    <ul class="footer-contact">
+                        <li><i class="fas fa-envelope me-2"></i> contact@timecapsule.com</li>
+                        <li><i class="fas fa-phone me-2"></i> +86 123 4567 8910</li>
+                    </ul>
+                </div>
+            </div>
+            <hr>
+            <div class="footer-bottom">
+                <p class="copyright">&copy; 2023 时光胶囊. 保留所有权利.</p>
+                <div class="social-icons">
+                    <a href="#" aria-label="微信"><i class="fab fa-weixin"></i></a>
+                    <a href="#" aria-label="微博"><i class="fab fa-weibo"></i></a>
+                    <a href="#" aria-label="QQ"><i class="fab fa-qq"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Back to top button -->
+    <button id="backToTopBtn" aria-label="返回顶部">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- Diary Entry Modal -->
+    <div class="modal fade" id="diaryEntryModal" tabindex="-1" aria-labelledby="diaryEntryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="diaryEntryModalLabel">新建日记</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="diaryForm">
+                        <input type="hidden" id="diaryEntryId">
+                        <div class="mb-3">
+                            <label for="diaryTitle" class="form-label">标题</label>
+                            <input type="text" class="form-control form-control-lg" id="diaryTitle" placeholder="请输入日记标题">
+                        </div>
+                        <div class="mb-3">
+                            <label for="diaryDate" class="form-label">日期</label>
+                            <input type="date" class="form-control form-control-lg" id="diaryDate">
+                        </div>
+                        <div class="mb-3">
+                            <label for="diaryContent" class="form-label">内容</label>
+                            <textarea class="form-control" id="diaryContent" rows="10" placeholder="请输入日记内容..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="diaryMood" class="form-label">心情</label>
+                            <select class="form-select form-select-lg" id="diaryMood">
+                                <option value="happy">开心 😊</option>
+                                <option value="calm">平静 😌</option>
+                                <option value="sad">难过 😢</option>
+                                <option value="excited">兴奋 🤩</option>
+                                <option value="angry">生气 😠</option>
+                                <option value="tired">疲惫 😫</option>
+                                <option value="nostalgic">怀旧 🥹</option>
+                            </select>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="diaryPin">
+                            <label class="form-check-label" for="diaryPin">置顶此日记</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" id="saveDiaryBtn" class="btn btn-primary">保存日记</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteDiaryModal" tabindex="-1" aria-labelledby="deleteDiaryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteDiaryModalLabel">
+                        <i class="fas fa-trash-alt me-2"></i> 删除日记
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <p>您确定要删除这篇日记吗？此操作不可撤销。</p>
+                    <div class="alert alert-warning">
+                        <strong>将要删除:</strong> <span id="deleteDiaryTitle">日记标题</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" id="confirmDeleteDiaryBtn" class="btn btn-danger">确认删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- User Session System -->
+    <script src="/static/js/userSession.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="/static/js/main.js"></script>
+    
+    <!-- Diary Page Script -->
+    <script src="/static/js/diary.js"></script>
+</body>
+</html> 

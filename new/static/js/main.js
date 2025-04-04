@@ -62,23 +62,11 @@ function initDeviceId() {
     if (!deviceIdElements.length) return;
     
     // Get UUID from localStorage
-    const uuid = localStorage.getItem('userUUID');
+    let uuid = localStorage.getItem('userUUID');
     if (!uuid) {
-        // If no UUID exists yet, check again after a short delay
-        // This handles cases where UUID is created by another script
-        setTimeout(() => {
-            const newUuid = localStorage.getItem('userUUID');
-            if (newUuid) {
-                deviceIdElements.forEach(element => {
-                    element.textContent = newUuid.substring(0, 8) + '...';
-                });
-            } else {
-                deviceIdElements.forEach(element => {
-                    element.textContent = '未找到';
-                });
-            }
-        }, 500);
-        return;
+        // Generate a new UUID immediately
+        uuid = generateUUID();
+        localStorage.setItem('userUUID', uuid);
     }
     
     // Update all elements
@@ -88,9 +76,21 @@ function initDeviceId() {
 }
 
 /**
+ * Generate a UUID v4
+ * @returns {string} A random UUID
+ */
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+/**
  * Font size control functionality
  * Allows users to increase or decrease text size with multiple levels
- * Shows current level (1-5) on center button
+ * Shows current level (3-5) on center button
  */
 function initFontSizeControls() {
     const decreaseBtn = document.getElementById('decreaseFontBtn');
@@ -99,12 +99,13 @@ function initFontSizeControls() {
     
     if (!decreaseBtn || !normalBtn || !increaseBtn) return;
     
-    // Define size levels from smallest to largest
-    const sizeLevels = ['x-small', 'small', 'normal', 'large', 'x-large'];
+    // Define size levels from smallest to largest (only normal, large, x-large)
+    const sizeLevels = ['normal', 'large', 'x-large'];
     
     // Function to remove all font size classes
     function removeAllFontSizeClasses() {
-        sizeLevels.forEach(size => {
+        // Remove all possible classes including the ones we no longer use
+        ['x-small', 'small', 'normal', 'large', 'x-large'].forEach(size => {
             document.body.classList.remove(`font-size-${size}`);
         });
         
@@ -117,13 +118,15 @@ function initFontSizeControls() {
     // Get current size level index
     function getCurrentSizeIndex() {
         const currentSize = localStorage.getItem('fontSizePreference') || 'normal';
-        return sizeLevels.indexOf(currentSize);
+        const index = sizeLevels.indexOf(currentSize);
+        // If stored preference is not in our new levels, default to normal (index 0)
+        return index >= 0 ? index : 0;
     }
     
-    // Update center button text to show current level (1-5)
+    // Update center button text to show current level (3-5)
     function updateCenterButtonText(index) {
-        // Convert 0-4 index to 1-5 display level
-        const displayLevel = index + 1;
+        // Convert 0-2 index to 3-5 display level
+        const displayLevel = index + 3;
         normalBtn.textContent = displayLevel.toString();
     }
     
@@ -141,9 +144,9 @@ function initFontSizeControls() {
         updateCenterButtonText(index);
         
         // Update active button
-        if (index === 2) { // normal is at index 2
+        if (index === 0) { // normal is at index 0 now
             normalBtn.classList.add('active');
-        } else if (index > 2) {
+        } else if (index > 0) {
             increaseBtn.classList.add('active');
         } else {
             decreaseBtn.classList.add('active');
@@ -154,7 +157,7 @@ function initFontSizeControls() {
     
     // Normal size (level 3)
     normalBtn.addEventListener('click', function() {
-        applySizeByIndex(2); // "normal" is at index 2
+        applySizeByIndex(0); // "normal" is at index 0 now
     });
     
     // Increase size
@@ -169,9 +172,11 @@ function initFontSizeControls() {
         applySizeByIndex(currentIndex - 1);
     });
     
-    // Apply saved font size preference
+    // Apply saved font size preference or default to normal
     const savedSize = localStorage.getItem('fontSizePreference') || 'normal';
-    applySizeByIndex(sizeLevels.indexOf(savedSize));
+    const savedIndex = sizeLevels.indexOf(savedSize);
+    // If saved size is not in our new range, use normal
+    applySizeByIndex(savedIndex >= 0 ? savedIndex : 0);
 }
 
 /**
