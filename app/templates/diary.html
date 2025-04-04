@@ -63,6 +63,26 @@
             z-index: 100;
         }
         
+        /* High contrast mode for header */
+        :root[data-theme="high-contrast"] .header {
+            background-color: #000000;
+            border-bottom: 1px solid var(--secondary-color);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+        
+        :root[data-theme="high-contrast"] .header-title {
+            color: var(--secondary-color);
+        }
+        
+        :root[data-theme="high-contrast"] .back-button {
+            color: var(--secondary-color);
+        }
+        
+        :root[data-theme="high-contrast"] .back-button:hover {
+            background-color: rgba(255, 255, 0, 0.2);
+        }
+        
         .back-button {
             background: none;
             border: none;
@@ -474,7 +494,7 @@
         
         // 返回按钮
         document.getElementById('back-button').addEventListener('click', function() {
-            window.location.href = '/';
+            window.location.href = '/home';
         });
         
         // 处理URL参数，预选择心情
@@ -599,10 +619,12 @@
             highContrast = !highContrast;
             if (highContrast) {
                 root.setAttribute('data-theme', 'high-contrast');
+                document.body.classList.add('high-contrast');
                 contrastToggle.textContent = '关闭';
                 contrastToggle.classList.add('active');
             } else {
                 root.removeAttribute('data-theme');
+                document.body.classList.remove('high-contrast');
                 contrastToggle.textContent = '开启';
                 contrastToggle.classList.remove('active');
             }
@@ -628,6 +650,7 @@
             if (savedHighContrast === 'true') {
                 highContrast = true;
                 root.setAttribute('data-theme', 'high-contrast');
+                document.body.classList.add('high-contrast');
                 contrastToggle.textContent = '关闭';
                 contrastToggle.classList.add('active');
             }

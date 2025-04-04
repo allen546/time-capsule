@@ -743,12 +743,10 @@
             highContrast = !highContrast;
             if (highContrast) {
                 root.setAttribute('data-theme', 'high-contrast');
-                document.body.classList.add('high-contrast');
                 contrastToggle.textContent = '关闭';
                 contrastToggle.classList.add('active');
             } else {
                 root.removeAttribute('data-theme');
-                document.body.classList.remove('high-contrast');
                 contrastToggle.textContent = '开启';
                 contrastToggle.classList.remove('active');
             }
@@ -774,7 +772,6 @@
             if (savedHighContrast === 'true') {
                 highContrast = true;
                 root.setAttribute('data-theme', 'high-contrast');
-                document.body.classList.add('high-contrast');
                 contrastToggle.textContent = '关闭';
                 contrastToggle.classList.add('active');
             }

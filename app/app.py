@@ -325,13 +325,13 @@ async def index(request):
 
 @app.route('/home')
 async def home(request):
-    """Serve the main page."""
+    """Serve the home page (same as index)."""
     try:
         async with aiofiles.open(os.path.join(templates_folder, 'index.html'), mode='r') as f:
             content = await f.read()
             return html(content)
     except Exception as e:
-        logger.error(f"Error serving index page: {str(e)}")
+        logger.error(f"Error serving home page: {str(e)}")
         return html("<h1>Error loading page</h1><p>Please try again later.</p>")
 
 @app.route('/profile')

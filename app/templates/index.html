@@ -332,6 +332,39 @@
         .card:nth-child(4) {
             animation: floatUp 0.8s ease forwards 0.8s;
         }
+
+        /* 情绪图标容器 */
+        .emotions-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding: 0 10px;
+        }
+        
+        .emotion-icon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        
+        .emotion-icon:hover {
+            background-color: rgba(255, 112, 67, 0.1);
+        }
+        
+        .emotion-icon span {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+        
+        .emotion-label {
+            font-size: var(--font-size-base);
+            color: var(--text-secondary);
+        }
     </style>
 </head>
 <body>
