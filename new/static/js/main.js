@@ -38,11 +38,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     initHelpButtons();
     initDeviceId();
     
-    // Demo functionality for the start chat button
-    document.getElementById('startChatBtn')?.addEventListener('click', function() {
-        alert('对话功能即将上线，敬请期待！');
-    });
-    
     // Demo functionality for the learn more button
     document.getElementById('learnMoreBtn')?.addEventListener('click', function() {
         window.scrollTo({

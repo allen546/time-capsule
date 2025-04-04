@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # API configuration
-API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-851c7c66c0e444b1822c113ff9314ba8")
+API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 API_URL = "https://api.deepseek.com/v1/chat/completions"
 DEFAULT_MODEL = "deepseek-chat"
 

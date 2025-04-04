@@ -57,6 +57,7 @@ class User(Base):
     
     # Relationships
     diary_entries = relationship("DiaryEntry", back_populates="user", cascade="all, delete-orphan")
+    chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(uuid='{self.uuid}', name='{self.name}')>"
@@ -113,6 +114,65 @@ class DiaryEntry(Base):
             "pinned": self.pinned,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class ChatSession(Base):
+    """Chat session model for storing chat conversations."""
+    
+    __tablename__ = "chat_sessions"
+    
+    id = Column(Integer, primary_key=True)
+    session_uuid = Column(String(36), unique=True, nullable=False, index=True)
+    user_uuid = Column(String(36), ForeignKey("users.uuid", ondelete="CASCADE"), nullable=False)
+    title = Column(String(200), nullable=False, default="New Chat")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="chat_sessions")
+    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<ChatSession(id={self.id}, title='{self.title}')>"
+    
+    def to_dict(self):
+        """Convert ChatSession object to dictionary."""
+        return {
+            "id": self.session_uuid,
+            "title": self.title,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "message_count": len(self.messages) if self.messages else 0
+        }
+
+
+class ChatMessage(Base):
+    """Chat message model for storing individual messages in a chat session."""
+    
+    __tablename__ = "chat_messages"
+    
+    id = Column(Integer, primary_key=True)
+    message_uuid = Column(String(36), unique=True, nullable=False, index=True)
+    session_uuid = Column(String(36), ForeignKey("chat_sessions.session_uuid", ondelete="CASCADE"), nullable=False)
+    is_user = Column(Boolean, default=True)  # True if message is from user, False if from AI
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # Relationships
+    session = relationship("ChatSession", back_populates="messages")
+    
+    def __repr__(self):
+        return f"<ChatMessage(id={self.id}, is_user={self.is_user})>"
+    
+    def to_dict(self):
+        """Convert ChatMessage object to dictionary."""
+        return {
+            "id": self.message_uuid,
+            "session_id": self.session_uuid,
+            "is_user": self.is_user,
+            "content": self.content,
+            "created_at": self.created_at.isoformat() if self.created_at else None
         }
 
 
@@ -235,12 +295,12 @@ class UserDB:
 
 
 class DiaryDB:
-    """Diary entry database operations."""
+    """Diary database operations."""
     
     @staticmethod
     async def get_entries_by_user(session, user_uuid):
         """Get all diary entries for a user."""
-        stmt = select(DiaryEntry).where(DiaryEntry.user_uuid == user_uuid)
+        stmt = select(DiaryEntry).where(DiaryEntry.user_uuid == user_uuid).order_by(DiaryEntry.created_at.desc())
         result = await session.execute(stmt)
         return result.scalars().all()
     
@@ -294,6 +354,80 @@ class DiaryDB:
         entry = await DiaryDB.get_entry_by_uuid(session, entry_uuid)
         if entry:
             await session.delete(entry)
+            await session.commit()
+            return True
+        return False
+
+
+class ChatDB:
+    """Chat database operations."""
+    
+    @staticmethod
+    async def get_sessions_by_user(session, user_uuid):
+        """Get all chat sessions for a user."""
+        stmt = select(ChatSession).where(ChatSession.user_uuid == user_uuid).order_by(ChatSession.updated_at.desc())
+        result = await session.execute(stmt)
+        return result.scalars().all()
+    
+    @staticmethod
+    async def get_session_by_uuid(session, session_uuid):
+        """Get a chat session by UUID."""
+        stmt = select(ChatSession).where(ChatSession.session_uuid == session_uuid)
+        result = await session.execute(stmt)
+        return result.scalars().first()
+    
+    @staticmethod
+    async def create_session(session, user_uuid, session_uuid, title="New Chat"):
+        """Create a new chat session."""
+        chat_session = ChatSession(
+            session_uuid=session_uuid,
+            user_uuid=user_uuid,
+            title=title
+        )
+        session.add(chat_session)
+        await session.commit()
+        await session.refresh(chat_session)
+        return chat_session
+    
+    @staticmethod
+    async def get_messages_by_session(session, session_uuid, limit=100, offset=0):
+        """Get chat messages for a session with pagination."""
+        # Order by created_at to ensure strict chronological order (oldest first)
+        stmt = select(ChatMessage).where(
+            ChatMessage.session_uuid == session_uuid
+        ).order_by(
+            ChatMessage.created_at.asc()  # Ensure chronological order with oldest messages first
+        ).offset(offset).limit(limit)
+        
+        result = await session.execute(stmt)
+        return result.scalars().all()
+    
+    @staticmethod
+    async def add_message(session, session_uuid, message_uuid, content, is_user=True):
+        """Add a message to a chat session."""
+        message = ChatMessage(
+            message_uuid=message_uuid,
+            session_uuid=session_uuid,
+            is_user=is_user,
+            content=content
+        )
+        session.add(message)
+        
+        # Update the session's updated_at timestamp
+        chat_session = await ChatDB.get_session_by_uuid(session, session_uuid)
+        if chat_session:
+            chat_session.updated_at = datetime.datetime.utcnow()
+        
+        await session.commit()
+        await session.refresh(message)
+        return message
+    
+    @staticmethod
+    async def delete_session(session, session_uuid):
+        """Delete a chat session and all its messages."""
+        chat_session = await ChatDB.get_session_by_uuid(session, session_uuid)
+        if chat_session:
+            await session.delete(chat_session)
             await session.commit()
             return True
         return False 
