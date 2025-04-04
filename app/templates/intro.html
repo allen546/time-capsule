@@ -211,13 +211,13 @@
         .capsule {
             position: absolute;
             width: 30px;
-            height: 50px;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            height: 40px;
+            background: linear-gradient(135deg, #FF7043, #FFA726);
             border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(255, 112, 67, 0.3);
             opacity: 0;
-            animation: floatCapsule 4s ease-in-out forwards;
-            box-shadow: 0 5px 15px rgba(255, 112, 67, 0.2);
-            bottom: -50px; /* 确保胶囊从底部开始 */
+            bottom: -50px;
+            animation: floatCapsule 3s ease-out forwards;
         }
 
         @keyframes floatCapsule {
@@ -430,25 +430,41 @@
                 // 显示胶囊动画
                 capsulesContainer.style.opacity = '1';
                 
-                // 创建胶囊元素
-                for (let i = 0; i < 150; i++) {
-                    const capsule = document.createElement('div');
-                    capsule.className = 'capsule';
-                    capsule.style.left = `${Math.random() * 100}%`;
-                    capsule.style.animationDelay = `${Math.random() * 2}s`;
-                    capsule.style.width = `${20 + Math.random() * 20}px`;
-                    capsule.style.height = `${30 + Math.random() * 30}px`;
-                    capsule.style.opacity = `${0.7 + Math.random() * 0.3}`;
-                    capsulesContainer.appendChild(capsule);
-                }
-                
-                // 延迟后跳转到主页
-                setTimeout(() => {
-                    // 使用 window.location.replace 来替换当前页面，而不是添加新的历史记录
-                    window.location.replace('/home');
-                }, 4000);
+                // 创建胶囊
+                createCapsules();
             });
         });
+
+        // 创建胶囊
+        function createCapsules() {
+            const container = document.querySelector('.capsules-container');
+            const capsuleCount = 500; // 增加胶囊数量从15个到50个
+            
+            for (let i = 0; i < capsuleCount; i++) {
+                const capsule = document.createElement('div');
+                capsule.className = 'capsule';
+                
+                // 随机位置
+                const left = Math.random() * 80 + 10; // 10% 到 90%
+                capsule.style.left = `${left}%`;
+                
+                // 随机大小
+                const size = Math.random() * 0.5 + 0.75; // 0.75 到 1.25
+                capsule.style.transform = `scale(${size})`;
+                
+                // 随机延迟
+                const delay = Math.random() * 3; // 0 到 3 秒
+                capsule.style.animationDelay = `${delay}s`;
+                
+                container.appendChild(capsule);
+            }
+            
+            // 确保所有胶囊动画都完成后再跳转
+            // 考虑到最长的动画延迟(3秒)加上动画持续时间(3秒)，总共需要6秒
+            setTimeout(() => {
+                window.location.replace('/home');
+            }, 5000);
+        }
     </script>
 </body>
 </html> 

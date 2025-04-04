@@ -32,12 +32,14 @@
             --text-color: #FFFFFF;
             --text-secondary: #FFFF00;
             --shadow: 0 8px 30px rgba(255, 255, 255, 0.2);
+            transition: all 0.5s ease;
         }
         
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            transition: color 0.5s ease, background-color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
         }
         
         body {
@@ -48,6 +50,7 @@
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             font-size: var(--font-size-base);
+            transition: font-size 0.5s ease, background-color 0.5s ease, color 0.5s ease;
         }
         
         .container {
@@ -71,12 +74,14 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            transition: font-size 0.5s ease, background 0.5s ease;
         }
         
         .subtitle {
             font-size: var(--font-size-xlarge);
             color: var(--text-secondary);
             font-weight: 400;
+            transition: font-size 0.5s ease, color 0.5s ease;
         }
         
         .cards-container {
@@ -125,12 +130,14 @@
             font-weight: 600;
             margin-bottom: 16px;
             color: var(--text-color);
+            transition: font-size 0.5s ease, color 0.5s ease;
         }
         
         .card-description {
             color: var(--text-secondary);
             margin-bottom: 24px;
             font-size: var(--font-size-base);
+            transition: font-size 0.5s ease, color 0.5s ease;
         }
         
         .button-container {
@@ -207,6 +214,7 @@
             font-weight: 600;
             margin-bottom: 5px;
             color: var(--text-color);
+            transition: font-size 0.5s ease, color 0.5s ease;
         }
         
         .accessibility-controls {
@@ -225,6 +233,7 @@
             font-size: var(--font-size-base);
             color: var(--text-color);
             min-width: 80px;
+            transition: font-size 0.5s ease, color 0.5s ease;
         }
         
         .font-size-controls {
@@ -435,6 +444,12 @@
             root.style.setProperty('--font-size-xlarge', `${20 * currentFontSize}px`);
             root.style.setProperty('--font-size-xxlarge', `${24 * currentFontSize}px`);
             root.style.setProperty('--font-size-xxxlarge', `${48 * currentFontSize}px`);
+            
+            // 添加过渡效果
+            document.body.style.transition = 'font-size 0.5s ease';
+            setTimeout(() => {
+                document.body.style.transition = '';
+            }, 500);
         }
         
         // 高对比度模式
