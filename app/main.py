@@ -30,33 +30,34 @@ User Management:
   - Response: User data (excluding password)
 
 Conversation Management:
-- GET /api/conversations/ids
-  - Get all conversation IDs for the current user
-  - Response: {"conversation_ids": ["uuid", ...]}
-
-- GET /api/conversations/{conversation_id}
-  - Get a specific conversation with all its messages
+- GET /api/conversation
+  - Get the user's conversation with all messages
   - Response: Conversation data with messages array
 
-- POST /api/conversations/new
-  - Create a new conversation
+- POST /api/conversation
+  - Create or update the user's conversation
   - Request: {"title": "string", "messages": [{"sender": "USER|BOT", "content": "string"}, ...]}
-  - Response: New conversation data with any initial messages
+  - Response: Conversation data with any initial messages
 
-- PUT /api/conversations/{conversation_id}
-  - Update a conversation's properties
+- PUT /api/conversation
+  - Update the user's conversation title
   - Request: {"title": "string"}
   - Response: Updated conversation data
 
-- DELETE /api/conversations/{conversation_id}
-  - Delete a conversation and all its messages
-  - Response: {"message": "Conversation {id} deleted successfully"}
+- DELETE /api/conversation
+  - Delete the user's conversation and all its messages
+  - Response: {"message": "Conversation deleted successfully"}
 
 Message Management:
-- POST /api/conversations/{conversation_id}/messages
-  - Add a message to a conversation
+- POST /api/conversation/messages
+  - Add a message to the user's conversation
   - Request: {"sender": "USER|BOT", "content": "string"}
   - Response: Created message data
+
+- POST /api/conversation/chat
+  - Send a message to the conversation and get an AI response
+  - Request: {"message": "string", "language": "zh|en"}
+  - Response: {"success": true, "message": {message_object}}
 """
 
 import os
@@ -65,6 +66,10 @@ from typing import Optional, Dict, Any, List, Union
 import json
 import functools
 import uuid
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Fix for bcrypt version error
 import bcrypt
@@ -99,8 +104,10 @@ app = Sanic("TimeCapsuleAPI")
 async def add_cors_headers(request, response):
     response.headers.update({
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "*",
-        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Max-Age": "3600"
     })
 
 # Configure static file serving
@@ -204,29 +211,32 @@ async def format_message(message):
     }
 
 
-async def get_authorized_conversation(user_id, conversation_id):
-    """Get a conversation only if it exists and belongs to the specified user."""
+async def get_authorized_conversation(user_id):
+    """Get a conversation for the specified user."""
     try:
-        conversation = await Conversation.get(id=conversation_id)
-        if conversation.user_id != user_id:
-            return None
+        user = await User.get(id=user_id)
+        conversation = await Conversation.get(user=user)
         return conversation
     except (Conversation.DoesNotExist, ValidationError):
         return None
 
 
-async def get_all_conversation_ids_for_user(user_id):
-    """Get all conversation IDs for a specific user."""
-    conversations = await Conversation.filter(user_id=user_id).only("id")
-    return [str(conv.id) for conv in conversations]
-
-
 async def create_conversation(user_id, title):
-    """Create a new conversation for a user."""
+    """Create a new conversation for a user or update the existing one."""
     user = await User.get_or_none(id=user_id)
     if not user:
         return None
     
+    # Check if user already has a conversation
+    existing_conversation = await Conversation.filter(user_id=user_id).first()
+    
+    if existing_conversation:
+        # Update existing conversation
+        existing_conversation.title = title
+        await existing_conversation.save()
+        return existing_conversation
+    
+    # Create new conversation
     conversation = await Conversation.create(
         user=user,
         title=title
@@ -234,10 +244,11 @@ async def create_conversation(user_id, title):
     return conversation
 
 
-async def add_message_to_conversation(conversation_id, sender, content):
-    """Add a new message to a conversation."""
+async def add_message_to_conversation(user_id, sender, content):
+    """Add a new message to a user's conversation."""
     try:
-        conversation = await Conversation.get(id=conversation_id)
+        user = await User.get(id=user_id)
+        conversation = await Conversation.get(user=user)
         
         message = await Message.create(
             conversation=conversation,
@@ -250,7 +261,7 @@ async def add_message_to_conversation(conversation_id, sender, content):
         await conversation.save()
         
         return message
-    except (Conversation.DoesNotExist, ValidationError):
+    except (User.DoesNotExist, Conversation.DoesNotExist, ValidationError):
         return None
 
 
@@ -258,6 +269,10 @@ async def add_message_to_conversation(conversation_id, sender, content):
 @app.listener('before_server_start')
 async def setup_db(app, loop):
     await init_db()
+    
+    # Register API routes
+    from app.api import register_all_routes
+    register_all_routes(app)
 
 
 @app.listener('after_server_stop')
@@ -346,33 +361,24 @@ async def get_user_profile(request):
 
 
 # Conversation routes
-@app.get("/api/conversations/ids")
+@app.get("/api/conversation")
 @login_required
-async def fetch_user_conversation_identifiers(request):
-    """Get all conversation IDs for the current user."""
-    user = request.ctx.user
-    conversation_ids = await get_all_conversation_ids_for_user(user.id)
-    return json_response({"conversation_ids": conversation_ids})
-
-
-@app.get("/api/conversations/<conversation_id>")
-@login_required
-async def retrieve_conversation_with_messages(request, conversation_id):
-    """Get a specific conversation with its messages."""
+async def retrieve_user_conversation(request):
+    """Get the user's conversation with messages."""
     user = request.ctx.user
     
-    # Get conversation if it exists and belongs to the user
-    conversation = await get_authorized_conversation(user.id, conversation_id)
+    # Get conversation if it exists
+    conversation = await get_authorized_conversation(user.id)
     if not conversation:
-        return json_response({"error": "Conversation not found"}, status=404)
+        return json_response({"error": "No conversation found"}, status=404)
     
     return json_response(await format_conversation(conversation, include_messages=True))
 
 
-@app.post("/api/conversations/new")
+@app.post("/api/conversation")
 @login_required
-async def initialize_new_conversation(request):
-    """Create a new conversation."""
+async def initialize_user_conversation(request):
+    """Create or update the user's conversation."""
     user = request.ctx.user
     data = request.json
     
@@ -396,7 +402,7 @@ async def initialize_new_conversation(request):
             try:
                 sender = MessageSender(msg["sender"])
                 await add_message_to_conversation(
-                    conversation_id=str(conversation.id),
+                    user_id=user.id,
                     sender=sender,
                     content=msg["content"]
                 )
@@ -408,17 +414,17 @@ async def initialize_new_conversation(request):
     return json_response(await format_conversation(conversation, include_messages=True))
 
 
-@app.put("/api/conversations/<conversation_id>")
+@app.put("/api/conversation")
 @login_required
-async def modify_conversation_properties(request, conversation_id):
-    """Update a conversation's title."""
+async def modify_conversation_properties(request):
+    """Update the user's conversation title."""
     user = request.ctx.user
     data = request.json
     
-    # Get conversation if it exists and belongs to the user
-    conversation = await get_authorized_conversation(user.id, conversation_id)
+    # Get conversation if it exists
+    conversation = await get_authorized_conversation(user.id)
     if not conversation:
-        return json_response({"error": "Conversation not found"}, status=404)
+        return json_response({"error": "No conversation found"}, status=404)
     
     # Update title if provided
     if "title" in data:
@@ -428,16 +434,16 @@ async def modify_conversation_properties(request, conversation_id):
     return json_response(await format_conversation(conversation))
 
 
-@app.delete("/api/conversations/<conversation_id>")
+@app.delete("/api/conversation")
 @login_required
-async def permanently_remove_conversation(request, conversation_id):
-    """Delete a conversation and all its messages."""
+async def permanently_remove_conversation(request):
+    """Delete the user's conversation and all its messages."""
     user = request.ctx.user
     
-    # Get conversation if it exists and belongs to the user
-    conversation = await get_authorized_conversation(user.id, conversation_id)
+    # Get conversation if it exists
+    conversation = await get_authorized_conversation(user.id)
     if not conversation:
-        return json_response({"error": "Conversation not found"}, status=404)
+        return json_response({"error": "No conversation found"}, status=404)
     
     # Delete all messages first (need to do this explicitly due to foreign key constraints)
     await Message.filter(conversation_id=conversation.id).delete()
@@ -445,35 +451,35 @@ async def permanently_remove_conversation(request, conversation_id):
     # Then delete the conversation
     await conversation.delete()
     
-    return json_response({"message": f"Conversation {conversation_id} deleted successfully"})
+    return json_response({"message": "Conversation deleted successfully"})
 
 
 # Message routes
-@app.post("/api/conversations/<conversation_id>/messages")
+@app.post("/api/conversation/messages")
 @login_required
-async def create_new_conversation_message(request, conversation_id):
-    """Add a new message to a conversation."""
+async def create_new_conversation_message(request):
+    """Add a new message to the user's conversation."""
     user = request.ctx.user
     data = request.json
     
-    # Get conversation if it exists and belongs to the user
-    conversation = await get_authorized_conversation(user.id, conversation_id)
+    # Get conversation if it exists
+    conversation = await get_authorized_conversation(user.id)
     if not conversation:
-        return json_response({"error": "Conversation not found"}, status=404)
+        return json_response({"error": "No conversation found"}, status=404)
     
     # Validate required fields
     if "sender" not in data or "content" not in data:
         return json_response({"error": "Missing sender or content"}, status=400)
     
     # Inner function to handle message creation
-    async def process_message_creation(conv_id, sender_value, content_value):
+    async def process_message_creation(user_id, sender_value, content_value):
         try:
             # Validate sender
             sender_enum = MessageSender(sender_value)
             
             # Add message using the existing helper function
             new_message = await add_message_to_conversation(
-                conversation_id=conv_id,
+                user_id=user_id,
                 sender=sender_enum,
                 content=content_value
             )
@@ -487,7 +493,7 @@ async def create_new_conversation_message(request, conversation_id):
     
     # Use the inner function to create the message
     message, error = await process_message_creation(
-        conv_id=conversation_id,
+        user_id=user.id,
         sender_value=data["sender"],
         content_value=data["content"]
     )
@@ -611,4 +617,15 @@ async def update_user_profile_data(request):
         })
     except Exception as e:
         logger.error(f"Error updating user profile: {str(e)}")
-        return json_response({"error": f"Failed to update profile: {str(e)}"}, status=500) 
+        return json_response({"error": f"Failed to update profile: {str(e)}"}, status=500)
+
+
+# Handle OPTIONS requests for preflight CORS
+@app.route("/<path:path>", methods=["OPTIONS"])
+async def handle_options(request, path):
+    return empty()
+
+# Handle root OPTIONS request
+@app.route("/", methods=["OPTIONS"])
+async def handle_root_options(request):
+    return empty() 

@@ -106,10 +106,12 @@ The Time Capsule application is specifically designed for elderly users, with sp
 - `GET /api/users/me` - Get current user data
 - `GET /api/users/profile` - Get user's profile information
 - `POST /api/users/profile/questionnaire` - Submit questionnaire responses
-- `POST /api/conversations` - Create a new conversation
-- `GET /api/conversations` - List user's conversations
-- `GET /api/conversations/{id}` - Get a specific conversation
-- `POST /api/conversations/{id}/messages` - Add a message to a conversation
+- `POST /api/conversation` - Create or update the user's conversation
+- `GET /api/conversation` - Get the user's conversation with messages
+- `PUT /api/conversation` - Update the user's conversation title
+- `DELETE /api/conversation` - Delete the user's conversation
+- `POST /api/conversation/messages` - Add a message to the user's conversation
+- `POST /api/conversation/chat` - Send a message and get AI-generated response
 
 ## 📝 Questionnaire System
 
