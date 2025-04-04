@@ -1,83 +1,134 @@
-# Time Capsule
+# 时光胶囊 (Time Capsule)
 
-A voice-based simulation that lets you interact with a 20-year-old version of an elderly person. This project handles user management, authentication, and conversation history.
+An interactive web application that allows elderly users to converse with a simulated version of their 20-year-old self, providing a nostalgic and reflective experience through AI-powered conversations.
 
-## Overview
+![Time Capsule](https://placehold.co/800x400/ffc107/212529?text=时光胶囊)
 
-Time Capsule processes user voice input, sends it to an external API for processing, and returns the simulated voice response. The system maintains conversation history and user data.
+## ✨ Features
 
-## Features
+- **AI-Powered Conversations**: Talk with a simulation of your 20-year-old self based on your memories
+- **Personalized Experience**: Complete a detailed questionnaire about your life at age 20
+- **Accessibility First**: Designed specifically for elderly users with:
+  - Adjustable font sizes
+  - High contrast mode
+  - Screen reader compatibility
+  - Simple, intuitive interface
+- **Bilingual Support**: Full support for both Chinese and English interactions
+- **Secure Authentication**: User account management with password protection
+- **Conversation History**: Save and revisit previous conversations
 
-- Voice input/output processing
-- User authentication and management
-- Conversation history storage
-- External API integration for voice simulation
+## 🛠️ Tech Stack
 
-## Tech Stack
+### Backend
+- **Framework**: Sanic/FastAPI with Python
+- **Database**: SQLite (Tortoise ORM)
+- **Authentication**: JWT tokens
+- **AI Integration**: Custom prompt engineering with third-party AI providers
 
-- Python with FastAPI for the backend server
-- MongoDB for data storage
-- JWT for authentication
-- API integration for voice processing
+### Frontend
+- **Framework**: Vanilla JavaScript with jQuery
+- **Styling**: Bootstrap 5 with custom accessibility enhancements
+- **Responsive Design**: Mobile and desktop friendly
+- **Icons**: Font Awesome
 
-## Setup
+## 🚀 Getting Started
 
-1. Clone this repository
-2. Create a virtual environment: `python -m venv venv`
-3. Activate the virtual environment:
-   - Windows: `venv\Scripts\activate`
-   - Unix/MacOS: `source venv/bin/activate`
-4. Install dependencies: `pip install -r requirements.txt`
-5. Configure environment variables (see `.env.example`)
-6. Run the development server: `uvicorn app.main:app --reload`
+### Prerequisites
+- Python 3.8 or higher
+- Node.js and npm (for frontend development)
 
-## API Endpoints
+### Installation
 
-- `POST /api/auth/register` - Create a new user account
-- `POST /api/auth/login` - Authenticate a user
-- `POST /api/conversations` - Start a new conversation
-- `GET /api/conversations` - Get conversation history
-- `POST /api/voice` - Submit voice input and get a response
-- `GET /api/questionnaire` - Get questionnaire questions
-- `POST /api/users/profile/questionnaire` - Submit questionnaire answers
-- `GET /api/users/profile` - Get user profile data
-- `PATCH /api/users/profile` - Update specific profile fields
+1. Clone the repository
+   ```bash
+   git clone https://github.com/yourusername/time-capsule.git
+   cd time-capsule
+   ```
 
-## Environment Variables
+2. Create and activate a virtual environment
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-Create a `.env` file in the root directory with the following:
+3. Install dependencies
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Run the application
+   ```bash
+   python run.py
+   ```
+
+5. Open your browser and navigate to `http://localhost:8080`
+
+## 📋 Usage Flow
+
+1. **Register/Login**: Create an account or sign in
+2. **Complete Questionnaire**: Fill out the detailed survey about your life at age 20
+3. **Start Conversations**: Begin interacting with your simulated younger self
+4. **Review History**: Revisit previous conversations anytime
+
+## 🧩 Project Structure
 
 ```
-PORT=8000
-MONGODB_URI=mongodb://localhost:27017/timecapsule
-JWT_SECRET=your_jwt_secret
-VOICE_API_KEY=your_voice_api_key
-VOICE_API_URL=https://api.example.com/voice
+time-capsule/
+├── app/                  # Backend application code
+│   ├── ai.py             # AI integration and prompt engineering
+│   ├── db.py             # Database models and utilities
+│   ├── main.py           # Main application entry point and routes
+│   ├── models.py         # Data models and schemas
+│   └── questionnaire.py  # Questionnaire processing logic
+├── static/               # Frontend static assets
+│   ├── css/              # Stylesheets with accessibility features
+│   ├── js/               # JavaScript for frontend functionality
+│   └── *.html            # HTML templates
+├── run.py                # Server startup script
+├── requirements.txt      # Python dependencies
+└── README.md             # Project documentation
 ```
 
-## Development
+## 👥 User Experience
 
-```
-uvicorn app.main:app --reload  # Start development server
-pytest                         # Run tests
-flake8                         # Run linter
-black .                        # Format code
-```
+The Time Capsule application is specifically designed for elderly users, with special attention to:
 
-## License
+- **Large, readable text** with adjustable sizes
+- **High color contrast** for better visibility
+- **Simple navigation** with clear, consistent UI patterns
+- **Helpful error messages** and confirmation dialogs
+- **Minimal cognitive load** with focused, step-by-step interactions
 
-MIT 
+## 🔗 API Endpoints
 
-## New Features
+- `POST /api/users/register` - Create a new user account
+- `POST /api/users/login` - Authenticate a user
+- `GET /api/users/me` - Get current user data
+- `GET /api/users/profile` - Get user's profile information
+- `POST /api/users/profile/questionnaire` - Submit questionnaire responses
+- `POST /api/conversations` - Create a new conversation
+- `GET /api/conversations` - List user's conversations
+- `GET /api/conversations/{id}` - Get a specific conversation
+- `POST /api/conversations/{id}/messages` - Add a message to a conversation
 
-### Young Self Questionnaire
+## 📝 Questionnaire System
 
-The system now includes a comprehensive questionnaire for collecting information about the user's life at age 20. This data is used to create a personalized AI simulation for conversations with the user's younger self.
+The questionnaire captures detailed information about the user's life at age 20, including:
 
-Key features:
-- Structured questionnaire with 12 key areas about the user's life
-- Support for both Chinese and English
-- Multiple ways to submit data (interactive CLI, API, free-text format)
-- Advanced text parsing to extract structured data
+- Basic information (name, location)
+- Occupation and education
+- Hobbies and interests
+- Important relationships
+- Significant events
+- Dreams and aspirations
+- Concerns and challenges
 
-For detailed documentation on the questionnaire system, see [QUESTIONNAIRE.md](QUESTIONNAIRE.md). 
+For more details, see [QUESTIONNAIRE.md](QUESTIONNAIRE.md).
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 
