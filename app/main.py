@@ -33,16 +33,7 @@ Conversation Management:
 - GET /api/conversation
   - Get the user's conversation with all messages
   - Response: Conversation data with messages array
-
-- POST /api/conversation
-  - Create or update the user's conversation
-  - Request: {"title": "string", "messages": [{"sender": "USER|BOT", "content": "string"}, ...]}
-  - Response: Conversation data with any initial messages
-
-- PUT /api/conversation
-  - Update the user's conversation title
-  - Request: {"title": "string"}
-  - Response: Updated conversation data
+  - Note: A conversation is automatically created if one doesn't exist
 
 - DELETE /api/conversation
   - Delete the user's conversation and all its messages
@@ -53,11 +44,13 @@ Message Management:
   - Add a message to the user's conversation
   - Request: {"sender": "USER|BOT", "content": "string"}
   - Response: Created message data
+  - Note: A conversation is automatically created if one doesn't exist
 
 - POST /api/conversation/chat
   - Send a message to the conversation and get an AI response
   - Request: {"message": "string", "language": "zh|en"}
   - Response: {"success": true, "message": {message_object}}
+  - Note: A conversation is automatically created if one doesn't exist
 """
 
 import os
@@ -88,6 +81,7 @@ from passlib.context import CryptContext
 from app.db import User, Conversation, Message, MessageSender, init_db, close_db
 from app.models import process_questionnaire_answers, update_user_profile
 from app.questionnaire import process_questionnaire_text, get_questionnaire_as_json
+from tortoise.exceptions import ValidationError
 
 # Security configurations
 SECRET_KEY = os.getenv("JWT_SECRET", "YOUR_SECRET_KEY_FOR_TESTING")
@@ -187,7 +181,6 @@ async def format_conversation(conversation, include_messages=False):
     """Format a conversation for API response."""
     result = {
         "id": str(conversation.id),
-        "title": conversation.title,
         "user_id": conversation.user_id,
         "created_at": str(conversation.created_at),
         "updated_at": str(conversation.updated_at)
@@ -221,8 +214,8 @@ async def get_authorized_conversation(user_id):
         return None
 
 
-async def create_conversation(user_id, title):
-    """Create a new conversation for a user or update the existing one."""
+async def create_conversation(user_id):
+    """Create a new conversation for a user if one doesn't exist."""
     user = await User.get_or_none(id=user_id)
     if not user:
         return None
@@ -231,15 +224,12 @@ async def create_conversation(user_id, title):
     existing_conversation = await Conversation.filter(user_id=user_id).first()
     
     if existing_conversation:
-        # Update existing conversation
-        existing_conversation.title = title
-        await existing_conversation.save()
+        # Return existing conversation
         return existing_conversation
     
     # Create new conversation
     conversation = await Conversation.create(
-        user=user,
-        title=title
+        user=user
     )
     return conversation
 
@@ -370,68 +360,12 @@ async def retrieve_user_conversation(request):
     # Get conversation if it exists
     conversation = await get_authorized_conversation(user.id)
     if not conversation:
-        return json_response({"error": "No conversation found"}, status=404)
+        # Auto-create a conversation if one doesn't exist
+        conversation = await create_conversation(user.id)
+        if not conversation:
+            return json_response({"error": "Failed to create conversation"}, status=500)
     
     return json_response(await format_conversation(conversation, include_messages=True))
-
-
-@app.post("/api/conversation")
-@login_required
-async def initialize_user_conversation(request):
-    """Create or update the user's conversation."""
-    user = request.ctx.user
-    data = request.json
-    
-    # Validate required fields
-    if "title" not in data:
-        return json_response({"error": "Missing title"}, status=400)
-    
-    # Create conversation
-    conversation = await create_conversation(
-        user_id=user.id,
-        title=data["title"]
-    )
-    
-    if not conversation:
-        return json_response({"error": "Failed to create conversation"}, status=500)
-    
-    # Add initial messages if provided
-    initial_messages = data.get("messages", [])
-    for msg in initial_messages:
-        if "sender" in msg and "content" in msg:
-            try:
-                sender = MessageSender(msg["sender"])
-                await add_message_to_conversation(
-                    user_id=user.id,
-                    sender=sender,
-                    content=msg["content"]
-                )
-            except ValueError:
-                # Invalid sender value, skip this message
-                pass
-    
-    # Get the complete conversation with messages
-    return json_response(await format_conversation(conversation, include_messages=True))
-
-
-@app.put("/api/conversation")
-@login_required
-async def modify_conversation_properties(request):
-    """Update the user's conversation title."""
-    user = request.ctx.user
-    data = request.json
-    
-    # Get conversation if it exists
-    conversation = await get_authorized_conversation(user.id)
-    if not conversation:
-        return json_response({"error": "No conversation found"}, status=404)
-    
-    # Update title if provided
-    if "title" in data:
-        conversation.title = data["title"]
-        await conversation.save()
-    
-    return json_response(await format_conversation(conversation))
 
 
 @app.delete("/api/conversation")
@@ -462,10 +396,12 @@ async def create_new_conversation_message(request):
     user = request.ctx.user
     data = request.json
     
-    # Get conversation if it exists
+    # Get conversation if it exists or create one
     conversation = await get_authorized_conversation(user.id)
     if not conversation:
-        return json_response({"error": "No conversation found"}, status=404)
+        conversation = await create_conversation(user.id)
+        if not conversation:
+            return json_response({"error": "Failed to create conversation"}, status=500)
     
     # Validate required fields
     if "sender" not in data or "content" not in data:

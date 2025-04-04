@@ -13,7 +13,7 @@ from sanic.response import json as json_response
 
 from app.db import Message, MessageSender, User
 from app.ai import chat_completion
-from app.main import login_required, get_authorized_conversation, add_message_to_conversation, format_message
+from app.main import login_required, get_authorized_conversation, add_message_to_conversation, format_message, create_conversation
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -59,10 +59,12 @@ async def chat_with_young_self(request: Request):
     # Get language preference (default to Chinese)
     language = data.get("language", "zh")
     
-    # Get conversation if it exists
+    # Get conversation if it exists or create a new one
     conversation = await get_authorized_conversation(user.id)
     if not conversation:
-        return json_response({"error": "No conversation found"}, status=404)
+        conversation = await create_conversation(user.id)
+        if not conversation:
+            return json_response({"error": "Failed to create conversation"}, status=500)
     
     try:
         # Add user message to conversation

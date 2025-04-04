@@ -69,7 +69,6 @@ class Conversation(models.Model):
     """Model to represent a conversation thread between a user and the chatbot."""
     id = fields.UUIDField(pk=True, default=uuid.uuid4)
     user = fields.OneToOneField("models.User", related_name="conversation")
-    title = fields.CharField(max_length=255, description="Title of the conversation")
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     
@@ -80,7 +79,7 @@ class Conversation(models.Model):
         table = "conversations"
     
     def __str__(self):
-        return f"Conversation {self.id} - {self.title} ({self.user.username})"
+        return f"Conversation {self.id} ({self.user.username})"
 
 
 class Message(models.Model):
