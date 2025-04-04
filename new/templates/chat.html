@@ -21,6 +21,7 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/chat.css">
     
     <!-- Chat-specific CSS -->
     <style>
@@ -232,6 +233,12 @@
             font-size: 20px;
         }
         
+        .send-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
         .empty-state {
             display: flex;
             flex-direction: column;
@@ -406,34 +413,21 @@
                                 </div>
                             </div>
                             
-                            <!-- Chat input area -->
-                            <div class="chat-input-container">
-                                <div class="position-relative">
-                                    <textarea id="chatInput" class="chat-input form-control" placeholder="输入您的消息..." rows="2" aria-label="聊天输入框"></textarea>
-                                    
-                                    <!-- Voice input button -->
-                                    <button id="voiceInputBtn" class="voice-btn" aria-label="语音输入">
-                                        <i class="fas fa-microphone"></i>
-                                    </button>
-                                    
-                                    <!-- Send button -->
-                                    <button id="sendMessageBtn" class="send-btn" aria-label="发送消息">
-                                        <i class="fas fa-paper-plane"></i>
-                                    </button>
-                                </div>
-                                
-                                <!-- Additional controls -->
-                                <div class="chat-controls">
-                                    <button id="clearChatBtn" class="control-btn">
-                                        <i class="fas fa-trash-alt"></i> 清空对话
-                                    </button>
-                                </div>
+                            <!-- Recording status indicator -->
+                            <div id="recordingStatus" class="recording-status">
+                                <div class="recording-dot"></div>
+                                <span id="recordingTime">00:00</span>
                             </div>
                             
-                            <!-- Recording status indicator (hidden by default) -->
-                            <div id="recordingStatus" class="alert alert-warning mt-3" style="display:none;">
-                                <i class="fas fa-microphone-alt me-2 fa-pulse"></i> 
-                                正在录音... <span id="recordingTime">0</span>秒
+                            <!-- Chat input area -->
+                            <div class="chat-input-container">
+                                <textarea id="chatInput" class="chat-input form-control" placeholder="输入您的消息..." rows="3"></textarea>
+                                <button id="voiceInputBtn" class="voice-btn" title="语音输入">
+                                    <i class="fas fa-microphone"></i>
+                                </button>
+                                <button id="sendMessageBtn" class="send-btn" title="发送消息">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -484,10 +478,19 @@
         <i class="fas fa-arrow-up"></i>
     </button>
 
-    <!-- Bootstrap JS with Popper -->
+    <!-- Loading indicator -->
+    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+        <div class="loading-text">思考中...</div>
+    </div>
+
+    <!-- Error message display -->
+    <div id="errorMessage" class="error-message"></div>
+
+    <!-- Bootstrap 5 JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- User Session System -->
+    <!-- User Session System - Must be loaded first -->
     <script src="/static/js/userSession.js"></script>
     
     <!-- Chat specific JavaScript -->

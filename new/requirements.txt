@@ -1,4 +1,7 @@
 aiofiles==23.1.0
+aiohttp==3.9.1
+aiosqlite==0.17.0
+greenlet==3.0.3
 html5tagger==1.3.0
 httptools==0.6.4
 multidict==6.3.2
