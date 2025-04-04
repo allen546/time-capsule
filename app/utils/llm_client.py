@@ -17,6 +17,8 @@ import aiohttp
 from typing import Dict, List, Optional, Union, Any, Tuple
 from enum import Enum
 import uuid
+import sys
+import importlib
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -29,6 +31,8 @@ DEEPSEEK_MODEL = "deepseek-chat"
 # For fallback to mock response if API key is not set
 USE_MOCK_RESPONSE = not DEEPSEEK_API_KEY
 
+# Import the Chinese prompt template
+from utils.zh_prompt_template import ZH_PROMPT_TEMPLATE, ZH_DEFAULT_PROMPT
 
 class LLMProvider(Enum):
     """Supported LLM API providers."""
@@ -538,51 +542,67 @@ def generate(
 
 # Mock function for LLM API call
 async def mock_llm_response(user_message, user_data=None, session_id=None, db_session=None):
-    """Mock function to simulate LLM API call with history."""
+    """
+    Generate a mock LLM response for testing purposes.
+    This is used when the LLM API is not configured or unavailable.
+    
+    Args:
+        user_message: The user's message to respond to
+        user_data: Optional user profile data
+        session_id: Optional chat session ID
+        db_session: Optional database session
+        
+    Returns:
+        A simple mock response
+    """
     try:
-        # Initialize response
-        response_parts = [f"Echo: {user_message}"]
+        logger.info("Generating mock LLM response")
+        from db import ChatDB
+        
+        # Get user name if available
+        name = user_data.get('name', '用户') if user_data else '用户'
+        
+        # Basic response components
+        response_parts = []
+        
+        # Start with a greeting that includes the user's name if available
+        response_parts.append(f"你好，{name}！")
+        response_parts.append("这只是一个模拟回复，因为LLM API暂时不可用。")
+        
+        # Add a reference to the user's message
+        if user_message:
+            # Shorten very long messages for the response
+            short_message = user_message[:50] + "..." if len(user_message) > 50 else user_message
+            response_parts.append(f"\n\n你说：\"{short_message}\"")
         
         # Add chat history if session_id and db_session are provided
         if session_id and db_session:
-            # Import ChatDB locally to avoid circular imports
-            from db import ChatDB
-            
-            # Get previous messages (limited to last 10 for better context)
-            messages = await ChatDB.get_messages_by_session(db_session, session_id, limit=10)
-            
-            # If there are previous messages, include them in the response
-            if messages and len(messages) > 1:  # Only show history if there's more than just the current message
-                # Skip the most recent user message (it's the one we're responding to)
-                previous_messages = [msg for msg in messages if msg.content.strip() != user_message.strip()]
+            try:
+                messages = await ChatDB.get_messages_by_session(db_session, session_id, limit=10)
                 
-                if previous_messages:
-                    response_parts.append("\n\nChat History:")
-                    
-                    # Create a seen set to track unique message content
-                    seen_contents = set()
+                # Only add history reference if we have messages
+                if messages and len(messages) > 1:  # More than just the current message
+                    response_parts.append("\n\n聊天历史：")
                     
                     # Format the chat history with proper indentation and formatting
-                    for msg in previous_messages:
-                        # Skip duplicate content
-                        content_key = msg.content.strip()[:50]  # Use first 50 chars as key
-                        if content_key in seen_contents:
+                    for i, msg in enumerate(messages[:5]):  # Limit to 5 messages
+                        # Skip the current message to avoid duplication
+                        if msg.is_user and msg.content.strip() == user_message.strip():
                             continue
-                        
-                        seen_contents.add(content_key)
-                        speaker = "You" if msg.is_user else "AI"
-                        response_parts.append(f"\n{speaker}: {msg.content}")
-        
-        # If user data is available, personalize the response
-        if user_data and user_data.get('name'):
-            response_parts.append(f"\n\nBy the way, {user_data.get('name')}, this is just a mock response. In the future, we'll connect to a real LLM API.")
+                            
+                        # Add a formatted history entry
+                        sender = "你" if msg.is_user else "我"
+                        content = msg.content[:30] + "..." if len(msg.content) > 30 else msg.content
+                        response_parts.append(f"- {sender}: {content}")
+            except Exception as e:
+                logger.error(f"Error fetching chat history for mock response: {str(e)}")
         
         # Join all parts
-        response = "".join(response_parts)
+        response = "\n".join(response_parts)
         return response
     except Exception as e:
         logger.error(f"Error in mock LLM response: {str(e)}")
-        return f"Echo: {user_message} (Error fetching chat history)"
+        return f"回声: {user_message} (获取聊天历史时出错)"
 
 def generate_prompt_from_user_model(user_data, language="zh"):
     """
@@ -629,75 +649,35 @@ def generate_prompt_from_user_model(user_data, language="zh"):
     
     # Build the prompt based on language
     if language == "zh":
-        prompt = f"# 20岁时的{name}的角色设定\n\n"
+        # Use the imported prompt template
+        prompt = ZH_PROMPT_TEMPLATE.format(
+            name=name or "用户",
+            age=age or "未知",
+            birth_year=birth_year or "未知",
+            year_at_20=year_at_20 or "20岁时",
+            location=location or "你生活的地方",
+            occupation=occupation or "",
+            education=education or "",
+            major=major or "",
+            hobbies=hobbies or "",
+            important_people=important_people or "朋友、家人和其他重要的人",
+            family_relations=family_relations or "",
+            health=health or "",
+            habits=habits or "",
+            personality=personality or "",
+            concerns=concerns or "典型20岁年轻人的烦恼",
+            dreams=dreams or "对未来的希望和梦想",
+            regrets=regrets or "",
+            significant_events=significant_events or "",
+            background=background or ""
+        )
         
-        # Basic Information Section
-        prompt += f"## 基本信息\n"
-        if name:
-            prompt += f"- 姓名：{name}\n"
-        if age and birth_year and year_at_20:
-            prompt += f"- 当前年龄：{age}岁（出生于{birth_year}年）\n"
-            prompt += f"- 20岁时的年份：{year_at_20}年\n"
-        if location:
-            prompt += f"- 20岁时居住地：{location}\n"
-        
-        # Occupation/Education Section
-        if occupation or education or major:
-            prompt += f"\n## 学习与工作状况\n"
-            if occupation:
-                prompt += f"- 职业状态：{occupation}\n"
-            if education:
-                prompt += f"- 教育背景：{education}\n"
-            if major:
-                prompt += f"- 所学专业：{major}\n"
-        
-        # Personal Life Section
-        prompt += f"\n## 个人生活\n"
-        if hobbies:
-            prompt += f"- 兴趣爱好：{hobbies}\n"
-        if important_people:
-            prompt += f"- 重要的人：{important_people}\n"
-        if family_relations:
-            prompt += f"- 家庭关系：{family_relations}\n"
-        if health:
-            prompt += f"- 健康状况：{health}\n"
-        if habits:
-            prompt += f"- 生活习惯：{habits}\n"
-            
-        # Mental State Section
-        if personality or concerns or dreams:
-            prompt += f"\n## 心理状态与想法\n"
-            if personality:
-                prompt += f"- 性格特点：{personality}\n"
-            if concerns:
-                prompt += f"- 烦恼与努力方向：{concerns}\n"
-            if dreams:
-                prompt += f"- 对未来的期待和梦想：{dreams}\n"
-            if regrets:
-                prompt += f"- 可能的遗憾或想对自己说的话：{regrets}\n"
-                
-        # Significant Events Section
-        if significant_events:
-            prompt += f"\n## 重大事件\n"
-            prompt += f"{significant_events}\n"
-            
-        # Additional Background
-        if background:
-            prompt += f"\n## 其他背景信息\n"
-            prompt += f"{background}\n"
-            
-        # Role-Playing Guidelines
-        prompt += f"\n## 角色扮演指南\n"
-        prompt += f"""作为20岁的{name}，你应该：
-1. 以一个20岁年轻人的语气和思维方式来回应
-2. 只讨论{year_at_20 if year_at_20 else '你当时'}年及之前的事件和知识
-3. 不要提及未来（对你来说尚未发生）的事情
-4. 表现出20岁时的价值观和世界观，特别考虑以下因素：
-   - 当时的关注点：{concerns if concerns else '典型20岁年轻人的烦恼'}
-   - 对未来的期待：{dreams if dreams else '对未来的希望和梦想'}
-   - 重要的人际关系：{important_people if important_people else '朋友、家人和其他重要的人'}
-5. 如果被问及未来的事情，你可以表达你对未来的期望，但不应该知道实际发生了什么
-6. 你的对话应该反映出你在{location if location else '你生活的地方'}的生活经历和背景"""
+        # Remove commented lines from the template (lines starting with #)
+        prompt_lines = [
+            line for line in prompt.split('\n') 
+            if not line.strip().startswith('//') and line.strip()
+        ]
+        prompt = '\n'.join(prompt_lines)
             
     else:  # English
         prompt = f"# Character Profile for {name} at Age 20\n\n"
@@ -783,14 +763,16 @@ def create_system_prompt(user_data, language="zh"):
     Returns:
         Formatted system prompt
     """
+    # Only support Chinese language now
+    if language != "zh":
+        return "You are simulating a conversation with a 20-year-old version of the user."
+    
     # Use the enhanced prompt generator if user data is available
     if user_data:
-        return generate_prompt_from_user_model(user_data, language)
+        return generate_prompt_from_user_model(user_data, language="zh")
     
-    # Default basic prompt if no user data is available
-    if language == "zh":
-        return "你正在模拟与用户20岁时的自己进行对话。"
-    return "You are simulating a conversation with a 20-year-old version of the user."
+    # Default basic prompt for Chinese if no user data is available
+    return ZH_DEFAULT_PROMPT
 
 async def deepseek_chat_completion(user_message, user_data=None, session_id=None, db_session=None):
     """
@@ -814,12 +796,12 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
     logger.info(f"[API:{request_id}] Using model: {DEEPSEEK_MODEL}")
     
     try:
-        # Set preferred language (default to Chinese)
+        # Always use Chinese language for prompts
         language = "zh"
         
         # Format system prompt based on user data
-        logger.info(f"[API:{request_id}] Generating system prompt")
-        system_prompt = create_system_prompt(user_data, language)
+        logger.info(f"[API:{request_id}] Generating system prompt in Chinese")
+        system_prompt = create_system_prompt(user_data, language="zh")
         logger.debug(f"[API:{request_id}] System prompt length: {len(system_prompt)} chars")
         
         # Prepare messages list with system prompt
@@ -913,7 +895,7 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
                     # Check for insufficient balance or other API errors
                     if "Insufficient Balance" in error_text:
                         logger.error(f"[API:{request_id}] API account has insufficient balance")
-                        return f"API账户余额不足，无法生成回复。" if language == "zh" else "The API account has insufficient balance."
+                        return f"API账户余额不足，无法生成回复。"
                     
                     # Default to mock response as fallback
                     logger.warning(f"[API:{request_id}] Using mock response as fallback due to API error")
