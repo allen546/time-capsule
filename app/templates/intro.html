@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时间胶囊 - 开场</title>
+    <style>
+        :root {
+            --primary-color: #FF7043;
+            --secondary-color: #FFA726;
+            --background-color: #FFF8E1;
+            --text-color: #3E2723;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Icons', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .intro-container {
+            text-align: center;
+            position: relative;
+            transform: translateY(0);
+            transition: all 0.8s ease;
+        }
+
+        .main-title {
+            font-size: 72px;
+            font-weight: 700;
+            opacity: 0;
+            animation: fadeIn 1s ease forwards;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+            transition: all 0.8s ease;
+        }
+
+        .subtitle {
+            font-size: 32px;
+            margin-top: 10px;
+            opacity: 0;
+            animation: fadeIn 1s ease forwards 0.5s;
+            color: var(--text-color);
+            font-weight: 300;
+            letter-spacing: 2px;
+            transition: all 0.8s ease;
+        }
+
+        .circle {
+            width: 70px;
+            height: 70px;
+            background-color: var(--primary-color);
+            border: none;
+            border-radius: 50%;
+            position: absolute;
+            bottom: -90px;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            animation: fadeIn 1s ease forwards 1s;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 112, 67, 0.3);
+            z-index: 10;
+        }
+
+        .circle:hover {
+            transform: translateX(-50%) scale(1.1);
+            box-shadow: 0 6px 20px rgba(255, 112, 67, 0.4);
+            background-color: var(--secondary-color);
+        }
+
+        .arrow {
+            width: 24px;
+            height: 24px;
+            position: relative;
+            transform: rotate(90deg);
+            margin-top: 0;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .arrow::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            border-radius: 50%;
+            clip-path: polygon(50% 70%, 0 20%, 100% 20%);
+        }
+
+        .circle:hover .arrow::before {
+            background-color: white;
+        }
+
+        .circle:hover .arrow {
+            transform: rotate(90deg) translateY(3px);
+        }
+
+        /* 产品理念卡片样式 */
+        .concept-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            z-index: 5;
+        }
+
+        .concept-title {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: var(--text-color);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+        }
+
+        .concept-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 800px;
+            width: 90%;
+        }
+
+        .concept-card {
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+        }
+
+        .concept-card h3 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+        }
+
+        .concept-card p {
+            font-size: 18px;
+            line-height: 1.6;
+            color: var(--text-color);
+        }
+
+        .welcome-button {
+            margin-top: 40px;
+            padding: 15px 30px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .welcome-button:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(255, 112, 67, 0.3);
+        }
+
+        /* 胶囊动画样式 */
+        .capsules-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 15;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        .capsule {
+            position: absolute;
+            width: 30px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-radius: 15px;
+            opacity: 0;
+            animation: floatCapsule 4s ease-in-out forwards;
+            box-shadow: 0 5px 15px rgba(255, 112, 67, 0.2);
+            bottom: -50px; /* 确保胶囊从底部开始 */
+        }
+
+        @keyframes floatCapsule {
+            0% {
+                opacity: 0;
+                transform: translateY(0) scale(0.5);
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-120vh) scale(1.5);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes moveUp {
+            from {
+                transform: translateY(0);
+            }
+            to {
+                transform: translateY(-20px);
+            }
+        }
+
+        .move-up {
+            animation: moveUp 0.5s ease forwards 1s;
+        }
+
+        /* 标题变大后的样式 */
+        .title-expanded {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0.1;
+            z-index: 1;
+            pointer-events: none;
+            transition: opacity 0.8s ease;
+        }
+
+        .title-expanded .main-title {
+            font-size: 200px;
+            opacity: 0.1;
+            animation: none;
+            margin-bottom: 0;
+        }
+
+        .title-expanded .subtitle {
+            font-size: 80px;
+            opacity: 0.1;
+            animation: none;
+        }
+
+        @media (max-width: 768px) {
+            .main-title {
+                font-size: 48px;
+            }
+            
+            .subtitle {
+                font-size: 24px;
+            }
+            
+            .circle {
+                width: 60px;
+                height: 60px;
+                bottom: -80px;
+            }
+            
+            .arrow {
+                width: 20px;
+                height: 20px;
+            }
+
+            .concept-title {
+                font-size: 28px;
+            }
+
+            .concept-card h3 {
+                font-size: 20px;
+            }
+
+            .concept-card p {
+                font-size: 16px;
+            }
+
+            .title-expanded .main-title {
+                font-size: 120px;
+            }
+
+            .title-expanded .subtitle {
+                font-size: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="intro-container">
+        <h1 class="main-title">时间胶囊</h1>
+        <div class="subtitle">time capsule</div>
+        <div class="circle">
+            <div class="arrow"></div>
+        </div>
+    </div>
+
+    <!-- 标题变大后的背景 -->
+    <div class="title-expanded">
+        <h1 class="main-title">时间胶囊</h1>
+        <div class="subtitle">time capsule</div>
+    </div>
+
+    <!-- 产品理念卡片 -->
+    <div class="concept-container">
+        <h2 class="concept-title">产品理念</h2>
+        <div class="concept-cards">
+            <div class="concept-card">
+                <h3>1. 与20岁的自己对话</h3>
+                <p>一个让老人与20岁的自己对话的软件，跨越时空的对话，连接过去与现在。</p>
+            </div>
+            <div class="concept-card">
+                <h3>2. 驱逐孤独，重建青春</h3>
+                <p>给更多老年人带来情感陪伴和记忆支持，重建青春时光，让晚年生活充满活力。</p>
+            </div>
+            <div class="concept-card">
+                <h3>3. 重燃激情，实现价值</h3>
+                <p>协助老人唤醒少年记忆，重燃passion，再次实现自我价值和认同感。</p>
+            </div>
+        </div>
+        <button class="welcome-button">填写欢迎表格</button>
+    </div>
+
+    <!-- 胶囊动画容器 -->
+    <div class="capsules-container"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.intro-container');
+            const circle = document.querySelector('.circle');
+            const titleExpanded = document.querySelector('.title-expanded');
+            const conceptContainer = document.querySelector('.concept-container');
+            const conceptTitle = document.querySelector('.concept-title');
+            const conceptCards = document.querySelectorAll('.concept-card');
+            const welcomeButton = document.querySelector('.welcome-button');
+            const capsulesContainer = document.querySelector('.capsules-container');
+            
+            // 添加向上移动的动画
+            setTimeout(() => {
+                container.classList.add('move-up');
+            }, 1000);
+
+            // 点击圆形按钮时的动画
+            circle.addEventListener('click', function() {
+                // 淡出当前内容
+                container.style.opacity = '0';
+                container.style.transform = 'translateY(-40px)';
+                
+                // 显示放大的标题作为背景
+                setTimeout(() => {
+                    titleExpanded.style.opacity = '0.1';
+                    
+                    // 显示产品理念卡片
+                    setTimeout(() => {
+                        conceptContainer.style.opacity = '1';
+                        conceptContainer.style.pointerEvents = 'auto';
+                        
+                        // 依次显示标题和卡片
+                        setTimeout(() => {
+                            conceptTitle.style.opacity = '1';
+                            conceptTitle.style.transform = 'translateY(0)';
+                            
+                            // 依次显示卡片
+                            conceptCards.forEach((card, index) => {
+                                setTimeout(() => {
+                                    card.style.opacity = '1';
+                                    card.style.transform = 'translateY(0)';
+                                }, 200 * (index + 1));
+                            });
+                            
+                            // 显示欢迎按钮
+                            setTimeout(() => {
+                                welcomeButton.style.opacity = '1';
+                                welcomeButton.style.transform = 'translateY(0)';
+                            }, 800);
+                        }, 500);
+                    }, 800);
+                }, 500);
+            });
+            
+            // 点击欢迎按钮时的动画
+            welcomeButton.addEventListener('click', function() {
+                // 隐藏概念容器
+                conceptContainer.style.opacity = '0';
+                
+                // 显示胶囊动画
+                capsulesContainer.style.opacity = '1';
+                
+                // 创建胶囊元素
+                for (let i = 0; i < 150; i++) {
+                    const capsule = document.createElement('div');
+                    capsule.className = 'capsule';
+                    capsule.style.left = `${Math.random() * 100}%`;
+                    capsule.style.animationDelay = `${Math.random() * 2}s`;
+                    capsule.style.width = `${20 + Math.random() * 20}px`;
+                    capsule.style.height = `${30 + Math.random() * 30}px`;
+                    capsule.style.opacity = `${0.7 + Math.random() * 0.3}`;
+                    capsulesContainer.appendChild(capsule);
+                }
+                
+                // 延迟后跳转到主页
+                setTimeout(() => {
+                    // 使用 window.location.replace 来替换当前页面，而不是添加新的历史记录
+                    window.location.replace('/home');
+                }, 4000);
+            });
+        });
+    </script>
+</body>
+</html> 

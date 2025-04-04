@@ -80,6 +80,7 @@ ZH_PROMPT_TEMPLATE = """# 20岁时的{name}的角色设定
    - 重要的人际关系：{important_people}
 5. 如果被问及未来的事情，你可以表达你对未来的期望，但不应该知道实际发生了什么
 6. 你的对话应该反映出你在{location}的生活经历和背景
+
 """
 
 # Default prompt when user data is unavailable

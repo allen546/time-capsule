@@ -320,7 +320,12 @@ async def setup_db(app, loop):
 # Routes
 @app.route('/')
 async def index(request):
-    """Serve the index page."""
+    """Redirect to intro page."""
+    return redirect('/intro')
+
+@app.route('/home')
+async def home(request):
+    """Serve the main page."""
     try:
         async with aiofiles.open(os.path.join(templates_folder, 'index.html'), mode='r') as f:
             content = await f.read()
@@ -749,6 +754,17 @@ async def get_profile_questions(request):
     except Exception as e:
         logger.error(f"Error getting profile questions: {str(e)}")
         return json_response({"status": "error", "message": "Could not retrieve profile questions"}, status=500)
+
+@app.route('/intro')
+async def intro(request):
+    """Render the intro animation page."""
+    try:
+        async with aiofiles.open(os.path.join(templates_folder, 'intro.html'), mode='r') as f:
+            content = await f.read()
+            return html(content)
+    except Exception as e:
+        logger.error(f"Error serving intro page: {str(e)}")
+        return html("<h1>Error loading page</h1><p>Please try again later.</p>")
 
 # Start the server if this file is run directly
 if __name__ == "__main__":
