@@ -3,467 +3,640 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>时间胶囊 - 开场</title>
+    <title>时间胶囊 - 动画效果</title>
     <style>
-        :root {
-            --primary-color: #FF7043;
-            --secondary-color: #FFA726;
-            --background-color: #FFF8E1;
-            --text-color: #3E2723;
-        }
-
-        * {
+        body {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Icons', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             overflow: hidden;
+            background-color: #FFF8E1;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Icons', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #3E2723;
         }
 
-        .intro-container {
-            text-align: center;
-            position: relative;
-            transform: translateY(0);
-            transition: all 0.8s ease;
-        }
-
-        .main-title {
-            font-size: 72px;
-            font-weight: 700;
-            opacity: 0;
-            animation: fadeIn 1s ease forwards;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 20px;
-            transition: all 0.8s ease;
-        }
-
-        .subtitle {
-            font-size: 32px;
-            margin-top: 10px;
-            opacity: 0;
-            animation: fadeIn 1s ease forwards 0.5s;
-            color: var(--text-color);
-            font-weight: 300;
-            letter-spacing: 2px;
-            transition: all 0.8s ease;
-        }
-
-        .circle {
-            width: 70px;
-            height: 70px;
-            background-color: var(--primary-color);
-            border: none;
-            border-radius: 50%;
-            position: absolute;
-            bottom: -90px;
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            animation: fadeIn 1s ease forwards 1s;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(255, 112, 67, 0.3);
-            z-index: 10;
-        }
-
-        .circle:hover {
-            transform: translateX(-50%) scale(1.1);
-            box-shadow: 0 6px 20px rgba(255, 112, 67, 0.4);
-            background-color: var(--secondary-color);
-        }
-
-        .arrow {
-            width: 24px;
-            height: 24px;
-            position: relative;
-            transform: rotate(90deg);
-            margin-top: 0;
-            transition: all 0.3s ease;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .arrow::before {
-            content: '';
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background-color: white;
-            border-radius: 50%;
-            clip-path: polygon(50% 70%, 0 20%, 100% 20%);
-        }
-
-        .circle:hover .arrow::before {
-            background-color: white;
-        }
-
-        .circle:hover .arrow {
-            transform: rotate(90deg) translateY(3px);
-        }
-
-        /* 产品理念卡片样式 */
-        .concept-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.5s ease;
-            z-index: 5;
-        }
-
-        .concept-title {
-            font-size: 36px;
-            font-weight: 700;
-            margin-bottom: 40px;
-            color: var(--text-color);
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.5s ease;
-        }
-
-        .concept-cards {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            max-width: 800px;
-            width: 90%;
-        }
-
-        .concept-card {
-            background-color: rgba(255, 255, 255, 0.9);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.5s ease;
-        }
-
-        .concept-card h3 {
-            font-size: 24px;
-            margin-bottom: 15px;
-            color: var(--primary-color);
-        }
-
-        .concept-card p {
-            font-size: 18px;
-            line-height: 1.6;
-            color: var(--text-color);
-        }
-
-        .welcome-button {
-            margin-top: 40px;
-            padding: 15px 30px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 30px;
-            font-size: 18px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            opacity: 0;
-            transform: translateY(20px);
-        }
-
-        .welcome-button:hover {
-            background-color: var(--secondary-color);
-            transform: translateY(-3px);
-            box-shadow: 0 10px 20px rgba(255, 112, 67, 0.3);
-        }
-
-        /* 胶囊动画样式 */
         .capsules-container {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 15;
-            opacity: 0;
-            transition: opacity 1s ease;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
         }
 
         .capsule {
             position: absolute;
-            width: 30px;
-            height: 40px;
+            width: 60px;
+            height: 90px;
             background: linear-gradient(135deg, #FF7043, #FFA726);
-            border-radius: 15px;
+            border-radius: 30px;
             box-shadow: 0 4px 15px rgba(255, 112, 67, 0.3);
             opacity: 0;
-            bottom: -50px;
-            animation: floatCapsule 3s ease-out forwards;
+            transform: translate(0, 0) scale(1);
+            animation: floatCapsule 4s forwards;
         }
 
         @keyframes floatCapsule {
             0% {
                 opacity: 0;
-                transform: translateY(0) scale(0.5);
+                transform: translate(var(--start-x), var(--start-y)) scale(1);
+            }
+            20% {
+                opacity: 1;
+                transform: translate(calc(var(--start-x) * 0.5), calc(var(--start-y) * 0.5)) scale(1);
+            }
+            70% {
+                opacity: 1;
+                transform: translate(calc(var(--end-x) * 0.6), calc(var(--end-y) * 0.6)) scale(0.8);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--end-x), var(--end-y)) scale(0.1);
+            }
+        }
+
+        .big-capsule-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            display: none;
+        }
+
+        .big-capsule {
+            width: 200px;
+            height: 300px;
+            background: linear-gradient(135deg, #FF7043, #FFA726);
+            border-radius: 100px;
+            box-shadow: 0 10px 30px rgba(255, 112, 67, 0.5);
+            opacity: 0;
+            transform: scale(0);
+            animation: none;
+        }
+
+        @keyframes bigCapsuleAppear {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes bigCapsuleExplode {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            30% {
+                transform: scale(1.3);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(10);
+                opacity: 0;
+            }
+        }
+
+        .particle {
+            position: absolute;
+            width: 40px;
+            height: 60px;
+            background: linear-gradient(135deg, #FF7043, #FFA726);
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(255, 112, 67, 0.3);
+            opacity: 0;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            animation: none;
+        }
+
+        @keyframes particleExplode {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 0;
             }
             10% {
                 opacity: 1;
             }
-            90% {
-                opacity: 1;
+            100% {
+                transform: translate(
+                    calc(-50% + var(--x-offset) * 100vw), 
+                    calc(-50% + var(--y-offset) * 100vh)
+                ) scale(1);
+                opacity: 0;
+            }
+        }
+
+        /* 第一幕：标题和按钮样式 */
+        .title-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 20;
+            opacity: 0;
+            display: none;
+            width: 80%;
+            max-width: 600px;
+        }
+
+        .main-title {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #FF7043, #FFA726);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 1s forwards;
+            animation-delay: 0.3s;
+        }
+
+        .subtitle {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            color: #8D6E63;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 1s forwards;
+            animation-delay: 0.6s;
+        }
+
+        @keyframes fadeInUp {
+            0% {
+                opacity: 0;
+                transform: translateY(30px);
             }
             100% {
-                opacity: 0;
-                transform: translateY(-120vh) scale(1.5);
-            }
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-            to {
                 opacity: 1;
-            }
-        }
-
-        @keyframes moveUp {
-            from {
                 transform: translateY(0);
             }
-            to {
-                transform: translateY(-20px);
-            }
         }
 
-        .move-up {
-            animation: moveUp 0.5s ease forwards 1s;
+        .start-button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #FF7043, #FFA726);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 112, 67, 0.3);
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 1s forwards;
+            animation-delay: 0.9s;
         }
 
-        /* 标题变大后的样式 */
-        .title-expanded {
+        .start-button:hover {
+            transform: scale(1.05) translateY(0);
+            box-shadow: 0 6px 20px rgba(255, 112, 67, 0.4);
+        }
+
+        /* 第二幕：产品理念展示样式 */
+        .concept-container {
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
+            background-color: #FFF8E1;
+            z-index: 30;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .concept-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        .concept-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            background: linear-gradient(135deg, #FF7043, #FFA726);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .concept-text {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            color: #5D4037;
+        }
+
+        .concept-point {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            opacity: 0;
+            transform: translateX(-30px);
+            animation: slideIn 0.5s forwards;
+        }
+
+        .concept-point-icon {
+            background: linear-gradient(135deg, #FF7043, #FFA726);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
-            opacity: 0.1;
-            z-index: 1;
-            pointer-events: none;
-            transition: opacity 0.8s ease;
+            margin-right: 15px;
+            color: white;
+            font-weight: bold;
         }
 
-        .title-expanded .main-title {
-            font-size: 200px;
-            opacity: 0.1;
-            animation: none;
-            margin-bottom: 0;
+        .concept-point-text {
+            text-align: left;
+            flex: 1;
         }
 
-        .title-expanded .subtitle {
-            font-size: 80px;
-            opacity: 0.1;
-            animation: none;
+        @keyframes slideIn {
+            0% {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
-        @media (max-width: 768px) {
-            .main-title {
-                font-size: 48px;
-            }
-            
-            .subtitle {
-                font-size: 24px;
-            }
-            
-            .circle {
-                width: 60px;
-                height: 60px;
-                bottom: -80px;
-            }
-            
-            .arrow {
-                width: 20px;
-                height: 20px;
-            }
+        .next-button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #FF7043, #FFA726);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 112, 67, 0.3);
+            transition: all 0.3s ease;
+            margin-top: 2rem;
+        }
 
-            .concept-title {
-                font-size: 28px;
-            }
+        .next-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(255, 112, 67, 0.4);
+        }
 
-            .concept-card h3 {
-                font-size: 20px;
-            }
+        /* 第三幕的胶囊动画 */
+        .final-capsules-container {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: none;
+            z-index: 40;
+        }
 
-            .concept-card p {
-                font-size: 16px;
-            }
+        .final-capsule {
+            position: absolute;
+            width: 60px;
+            height: 90px;
+            background: linear-gradient(135deg, #FF7043, #FFA726);
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(255, 112, 67, 0.3);
+            opacity: 0;
+            bottom: -50px;
+            animation: finalCapsuleFloat 3s ease-out forwards;
+        }
 
-            .title-expanded .main-title {
-                font-size: 120px;
+        @keyframes finalCapsuleFloat {
+            0% {
+                opacity: 0;
+                transform: translateY(0) scale(1);
             }
-
-            .title-expanded .subtitle {
-                font-size: 40px;
+            15% {
+                opacity: 1;
+            }
+            85% {
+                opacity: 1;
+                transform: translateY(-100vh) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-120vh) scale(0.5);
             }
         }
     </style>
 </head>
 <body>
-    <div class="intro-container">
-        <h1 class="main-title">时间胶囊</h1>
-        <div class="subtitle">time capsule</div>
-        <div class="circle">
-            <div class="arrow"></div>
+    <div class="capsules-container">
+        <!-- 小胶囊将在这里生成 -->
+    </div>
+    <div class="big-capsule-container">
+        <div class="big-capsule">
+            <!-- 大胶囊 -->
         </div>
     </div>
 
-    <!-- 标题变大后的背景 -->
-    <div class="title-expanded">
+    <!-- 第一幕：标题和按钮 -->
+    <div class="title-container" id="titleContainer">
         <h1 class="main-title">时间胶囊</h1>
-        <div class="subtitle">time capsule</div>
+        <p class="subtitle">捕捉每一个珍贵瞬间，留存时间的记忆</p>
+        <button class="start-button" id="startButton">开始体验</button>
     </div>
 
-    <!-- 产品理念卡片 -->
-    <div class="concept-container">
-        <h2 class="concept-title">产品理念</h2>
-        <div class="concept-cards">
-            <div class="concept-card">
-                <h3>1. 与20岁的自己对话</h3>
-                <p>一个让老人与20岁的自己对话的软件，跨越时空的对话，连接过去与现在。</p>
+    <!-- 第二幕：产品理念展示 -->
+    <div class="concept-container" id="conceptContainer">
+        <div class="concept-content">
+            <h2 class="concept-title">我们的理念</h2>
+            <p class="concept-text">时间胶囊帮助您记录生活点滴，珍藏美好回忆，让每一个值得纪念的瞬间都能被永久保存。</p>
+            
+            <div class="concept-point" style="animation-delay: 0.3s;">
+                <div class="concept-point-icon">1</div>
+                <div class="concept-point-text">记录日常：简单便捷地记录您的日常生活和感受。</div>
             </div>
-            <div class="concept-card">
-                <h3>2. 驱逐孤独，重建青春</h3>
-                <p>给更多老年人带来情感陪伴和记忆支持，重建青春时光，让晚年生活充满活力。</p>
+            
+            <div class="concept-point" style="animation-delay: 0.6s;">
+                <div class="concept-point-icon">2</div>
+                <div class="concept-point-text">智能分析：AI辅助分析您的情绪变化和生活规律。</div>
             </div>
-            <div class="concept-card">
-                <h3>3. 重燃激情，实现价值</h3>
-                <p>协助老人唤醒少年记忆，重燃passion，再次实现自我价值和认同感。</p>
+            
+            <div class="concept-point" style="animation-delay: 0.9s;">
+                <div class="concept-point-icon">3</div>
+                <div class="concept-point-text">时光回溯：在未来的某一天，重温过去的美好记忆。</div>
             </div>
+            
+            <button class="next-button" id="nextButton">探索更多</button>
         </div>
-        <button class="welcome-button">填写欢迎表格</button>
     </div>
 
-    <!-- 胶囊动画容器 -->
-    <div class="capsules-container"></div>
+    <!-- 第三幕：最终胶囊动画 -->
+    <div class="final-capsules-container" id="finalCapsulesContainer">
+        <!-- 最终胶囊动画将在这里生成 -->
+    </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const container = document.querySelector('.intro-container');
-            const circle = document.querySelector('.circle');
-            const titleExpanded = document.querySelector('.title-expanded');
-            const conceptContainer = document.querySelector('.concept-container');
-            const conceptTitle = document.querySelector('.concept-title');
-            const conceptCards = document.querySelectorAll('.concept-card');
-            const welcomeButton = document.querySelector('.welcome-button');
-            const capsulesContainer = document.querySelector('.capsules-container');
+        document.addEventListener('DOMContentLoaded', () => {
+            // 序列1：创建小胶囊
+            createCapsules();
             
-            // 添加向上移动的动画
+            // 序列1：延迟后显示大胶囊
             setTimeout(() => {
-                container.classList.add('move-up');
-            }, 1000);
-
-            // 点击圆形按钮时的动画
-            circle.addEventListener('click', function() {
-                // 淡出当前内容
-                container.style.opacity = '0';
-                container.style.transform = 'translateY(-40px)';
-                
-                // 显示放大的标题作为背景
-                setTimeout(() => {
-                    titleExpanded.style.opacity = '0.1';
-                    
-                    // 显示产品理念卡片
-                    setTimeout(() => {
-                        conceptContainer.style.opacity = '1';
-                        conceptContainer.style.pointerEvents = 'auto';
-                        
-                        // 依次显示标题和卡片
-                        setTimeout(() => {
-                            conceptTitle.style.opacity = '1';
-                            conceptTitle.style.transform = 'translateY(0)';
-                            
-                            // 依次显示卡片
-                            conceptCards.forEach((card, index) => {
-                                setTimeout(() => {
-                                    card.style.opacity = '1';
-                                    card.style.transform = 'translateY(0)';
-                                }, 200 * (index + 1));
-                            });
-                            
-                            // 显示欢迎按钮
-                            setTimeout(() => {
-                                welcomeButton.style.opacity = '1';
-                                welcomeButton.style.transform = 'translateY(0)';
-                            }, 800);
-                        }, 500);
-                    }, 800);
-                }, 500);
-            });
+                showBigCapsule();
+            }, 4000); // 4秒后显示大胶囊
             
-            // 点击欢迎按钮时的动画
-            welcomeButton.addEventListener('click', function() {
-                // 隐藏概念容器
-                conceptContainer.style.opacity = '0';
-                
-                // 显示胶囊动画
-                capsulesContainer.style.opacity = '1';
-                
-                // 创建胶囊
-                createCapsules();
-            });
+            // 序列1：再延迟后爆炸大胶囊
+            setTimeout(() => {
+                explodeBigCapsule();
+            }, 6000); // 6秒后爆炸大胶囊
+            
+            // 序列1结束后，开始序列2（显示标题）
+            setTimeout(() => {
+                showTitleAndButton();
+            }, 8000); // 8秒后显示标题和按钮
         });
 
-        // 创建胶囊
+        // 创建小胶囊
         function createCapsules() {
             const container = document.querySelector('.capsules-container');
-            const capsuleCount = 500; // 增加胶囊数量从15个到50个
+            const capsuleCount = 300; // 再次增加胶囊数量
             
+            // 在四周创建胶囊，而不是只从底部
             for (let i = 0; i < capsuleCount; i++) {
                 const capsule = document.createElement('div');
                 capsule.className = 'capsule';
                 
-                // 随机位置
-                const left = Math.random() * 80 + 10; // 10% 到 90%
+                // 决定胶囊的起始位置（四周而不仅仅是底部）
+                let position = Math.floor(Math.random() * 4); // 0:左边, 1:右边, 2:底部, 3:顶部
+                let left, bottom, transform, startX, startY;
+                
+                switch(position) {
+                    case 0: // 左边
+                        left = -5 - Math.random() * 10; // 左边界外
+                        bottom = Math.random() * 100;
+                        startX = 30 + Math.random() * 30; // 向右移动
+                        startY = 0;
+                        break;
+                    case 1: // 右边
+                        left = 105 + Math.random() * 10; // 右边界外
+                        bottom = Math.random() * 100;
+                        startX = -30 - Math.random() * 30; // 向左移动
+                        startY = 0;
+                        break;
+                    case 2: // 底部
+                        left = Math.random() * 100;
+                        bottom = -10 - Math.random() * 20; // 底部边界外
+                        startX = 0;
+                        startY = 30 + Math.random() * 30; // 向上移动
+                        break;
+                    case 3: // 顶部
+                        left = Math.random() * 100;
+                        bottom = 110 + Math.random() * 20; // 顶部边界外
+                        startX = 0;
+                        startY = -30 - Math.random() * 30; // 向下移动
+                        break;
+                }
+                
                 capsule.style.left = `${left}%`;
+                capsule.style.bottom = `${bottom}%`;
+                
+                // 根据位置设置不同的初始移动方向
+                if (position === 0 || position === 1) {
+                    capsule.style.setProperty('--start-x', `${startX}vw`);
+                    capsule.style.setProperty('--start-y', `${startY}vh`);
+                } else {
+                    capsule.style.setProperty('--start-x', `${startX}vw`);
+                    capsule.style.setProperty('--start-y', `${startY}vh`);
+                }
+                
+                // 计算到中心点的向量
+                const endX = 50 - left; // 水平方向到中心的距离
+                const endY = 50 - bottom; // 垂直方向到中心的距离
+                
+                capsule.style.setProperty('--end-x', `${endX}vw`);
+                capsule.style.setProperty('--end-y', `${endY}vh`);
                 
                 // 随机大小
-                const size = Math.random() * 0.5 + 0.75; // 0.75 到 1.25
+                const size = Math.random() * 0.5 + 0.75;
                 capsule.style.transform = `scale(${size})`;
                 
                 // 随机延迟
-                const delay = Math.random() * 3; // 0 到 3 秒
+                const delay = Math.random() * 2;
                 capsule.style.animationDelay = `${delay}s`;
                 
                 container.appendChild(capsule);
             }
+        }
+
+        // 显示大胶囊
+        function showBigCapsule() {
+            const bigCapsuleContainer = document.querySelector('.big-capsule-container');
+            const bigCapsule = document.querySelector('.big-capsule');
             
-            // 确保所有胶囊动画都完成后再跳转
-            // 考虑到最长的动画延迟(3秒)加上动画持续时间(3秒)，总共需要6秒
+            bigCapsuleContainer.style.display = 'block';
+            bigCapsule.style.animation = 'bigCapsuleAppear 1s forwards';
+        }
+
+        // 爆炸大胶囊
+        function explodeBigCapsule() {
+            const bigCapsule = document.querySelector('.big-capsule');
+            const container = document.querySelector('.capsules-container');
+            
+            // 先爆炸大胶囊
+            bigCapsule.style.animation = 'bigCapsuleExplode 2s forwards';
+            
+            // 创建爆炸粒子
+            const particleCount = 80; // 增加粒子数量
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                // 随机方向，增加扩散范围
+                const xOffset = (Math.random() - 0.5) * 2.5; // -1.25 到 1.25
+                const yOffset = (Math.random() - 0.5) * 2.5; // -1.25 到 1.25
+                
+                particle.style.setProperty('--x-offset', xOffset);
+                particle.style.setProperty('--y-offset', yOffset);
+                
+                // 随机大小和形状变化
+                const size = Math.random() * 0.6 + 0.4; // 0.4 到 1
+                particle.style.transform = `scale(${size})`;
+                if (Math.random() > 0.7) { // 30%的概率生成更圆的粒子
+                    particle.style.borderRadius = "50%";
+                    particle.style.width = "50px";
+                    particle.style.height = "50px";
+                }
+                
+                // 随机延迟
+                const delay = Math.random() * 0.3; // 0 到 0.3 秒
+                particle.style.animationDelay = `${delay}s`;
+                
+                // 设置动画时间，随机化，让爆炸更有层次感
+                const duration = 1.5 + Math.random() * 1; // 1.5 到 2.5 秒
+                particle.style.animation = `particleExplode ${duration}s forwards`;
+                
+                container.appendChild(particle);
+            }
+        }
+
+        // 显示标题和按钮（第一幕）
+        function showTitleAndButton() {
+            const titleContainer = document.getElementById('titleContainer');
+            titleContainer.style.display = 'block';
+            
+            // 使用setTimeout确保DOM更新后再设置opacity
             setTimeout(() => {
-                window.location.replace('/home');
-            }, 5000);
+                titleContainer.style.opacity = '1';
+            }, 100);
+            
+            // 添加按钮点击事件
+            document.getElementById('startButton').addEventListener('click', () => {
+                // 显示第二幕：产品理念
+                showConcept();
+            });
+        }
+
+        // 显示产品理念（第二幕）
+        function showConcept() {
+            // 隐藏第一幕
+            document.getElementById('titleContainer').style.opacity = '0';
+            
+            // 显示第二幕
+            const conceptContainer = document.getElementById('conceptContainer');
+            conceptContainer.style.display = 'block';
+            
+            // 使用setTimeout确保DOM更新后再设置opacity
+            setTimeout(() => {
+                conceptContainer.style.opacity = '1';
+                
+                // 设置concept-point的动画
+                document.querySelectorAll('.concept-point').forEach((point, index) => {
+                    point.style.animationDelay = `${0.3 * (index + 1)}s`;
+                    point.style.animationPlayState = 'running';
+                });
+            }, 100);
+            
+            // 添加按钮点击事件
+            document.getElementById('nextButton').addEventListener('click', () => {
+                // 显示第三幕：最终胶囊动画
+                showFinalCapsules();
+            });
+        }
+
+        // 显示最终胶囊动画（第三幕）
+        function showFinalCapsules() {
+            // 隐藏第二幕
+            document.getElementById('conceptContainer').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('conceptContainer').style.display = 'none';
+                
+                // 显示第三幕
+                const finalCapsulesContainer = document.getElementById('finalCapsulesContainer');
+                finalCapsulesContainer.style.display = 'block';
+                
+                // 清空容器，以防之前的动画残留
+                finalCapsulesContainer.innerHTML = '';
+                
+                // 创建最终的胶囊动画
+                createFinalCapsules();
+                
+                // 延迟后跳转到home页面
+                setTimeout(() => {
+                    window.location.replace('/home');
+                }, 7000); // 延长到7秒，给胶囊更多时间上升
+            }, 500); // 等待第二幕完全淡出
+        }
+
+        // 创建最终的胶囊动画
+        function createFinalCapsules() {
+            const container = document.getElementById('finalCapsulesContainer');
+            const capsuleCount = 350; // 增加胶囊数量
+            
+            for (let i = 0; i < capsuleCount; i++) {
+                const capsule = document.createElement('div');
+                capsule.className = 'final-capsule';
+                
+                // 随机位置，从底部向上
+                const left = Math.random() * 100;
+                capsule.style.left = `${left}%`;
+                
+                // 随机大小
+                const size = Math.random() * 0.6 + 0.6; // 0.6 到 1.2
+                capsule.style.transform = `scale(${size})`;
+                
+                // 随机颜色变化
+                if (Math.random() > 0.7) {
+                    // 30%几率使用不同的颜色渐变
+                    const hue1 = Math.floor(Math.random() * 40) + 10; // 10-50
+                    const hue2 = hue1 + Math.floor(Math.random() * 20) + 10; // hue1 + (10-30)
+                    capsule.style.background = `linear-gradient(135deg, hsl(${hue1}, 100%, 60%), hsl(${hue2}, 100%, 60%))`;
+                }
+                
+                // 随机形状变化
+                if (Math.random() > 0.8) {
+                    // 20%几率变为更圆的形状
+                    capsule.style.borderRadius = "40px";
+                    capsule.style.height = `${70 + Math.random() * 30}px`;
+                }
+                
+                // 随机延迟
+                const delay = Math.random() * 3;
+                capsule.style.animationDelay = `${delay}s`;
+                
+                container.appendChild(capsule);
+            }
         }
     </script>
 </body>
