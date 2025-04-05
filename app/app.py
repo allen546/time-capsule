@@ -21,6 +21,14 @@ from functools import wraps
 from websockets.exceptions import WebSocketProtocolError
 from sqlalchemy.exc import DBAPIError
 from typing import Dict, List, Optional, Union, Any, Tuple
+import argparse
+from sqlalchemy import select
+import traceback
+from sanic.handlers import ErrorHandler
+from sanic.exceptions import SanicException, NotFound, Unauthorized, InvalidUsage
+
+# Import configuration
+from config import CONFIG, get_db_url, DATA_DIR, get_secret, ENV
 
 # Import database module
 from db import init_db, get_session, DiaryDB, UserDB, ChatDB, async_session
@@ -35,11 +43,23 @@ from routes.contacts import bp as contacts_bp
 # Import LLM utils instead of defining functions here
 from utils.llm_client import llm_response
 
+# Rate limiting configuration
+RATE_LIMIT = {
+    "enabled": True,
+    "default_rate": 30,  # requests per minute
+    "admin_rate": 60,    # requests per minute
+    "login_rate": 5,     # requests per minute
+    "whitelist": ["127.0.0.1", "::1"]  # localhost
+}
+
+# Rate limiting storage (in-memory for simplicity, use Redis in production)
+rate_limit_storage = {}
+
 def configure_logging():
     """Configure application logging."""
     # Basic logging configuration
     logging.basicConfig(
-        level=logging.INFO,
+        level=getattr(logging, CONFIG["log_level"]),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(),
@@ -53,7 +73,7 @@ def configure_logging():
     logging.getLogger('sanic.root').setLevel(logging.ERROR)
     logging.getLogger('sanic.error').setLevel(logging.WARNING)
     
-    # Set up chat-related loggers with detailed logging - Debug level to catch everything
+    # Set up chat-related loggers with detailed logging - WARN level to catch profile checks
     websocket_logger = logging.getLogger('websocket')
     websocket_logger.setLevel(logging.INFO)
     
@@ -62,14 +82,22 @@ def configure_logging():
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # Configure chat logger to show DEBUG level (maximum detail)
+    # Configure chat logger to show WARNING level (to make profile checks more visible)
     chat_logger = logging.getLogger('chat')
-    chat_logger.setLevel(logging.DEBUG)  # Set to DEBUG to capture all detail
+    chat_logger.setLevel(logging.WARNING)  # Set to WARNING to focus on profile checks
     
-    # Add a StreamHandler for console output with the detailed formatter
+    # Create a file specifically for profile checks
+    profile_file_handler = logging.FileHandler('profile_checks.log')
+    profile_file_handler.setFormatter(detailed_formatter)
+    profile_file_handler.setLevel(logging.WARNING)
+    chat_logger.addHandler(profile_file_handler)
+    
+    # Add a StreamHandler with distinctive formatting for console output
     chat_handler = logging.StreamHandler()
-    chat_handler.setFormatter(detailed_formatter)
-    chat_handler.setLevel(logging.DEBUG)
+    chat_handler.setFormatter(logging.Formatter(
+        '\033[1;33m%(asctime)s - CHAT - %(levelname)s - %(message)s\033[0m'  # Yellow bold text
+    ))
+    chat_handler.setLevel(logging.WARNING)
     chat_logger.addHandler(chat_handler)
     
     # Set up non-chat API loggers with minimal logging
@@ -96,14 +124,61 @@ def configure_logging():
 # Configure logging
 logger = configure_logging()
 
-# Initialize Sanic app
-app = Sanic("TimeCapsule")
+# Custom error handler
+class CustomErrorHandler(ErrorHandler):
+    def default(self, request, exception):
+        """Handle uncaught exceptions."""
+        error_uuid = str(uuid.uuid4())[:8]
+        error_type = type(exception).__name__
+        
+        # Get error details but limit traceback for security
+        error_msg = str(exception)
+        error_traceback = traceback.format_exc()
+        
+        # Log the complete error for debugging
+        logger.error(f"[ERROR:{error_uuid}] Uncaught {error_type}: {error_msg}")
+        logger.debug(f"[ERROR:{error_uuid}] Traceback: {error_traceback}")
+        
+        # Prepare safe response - don't expose implementation details to client
+        if isinstance(exception, SanicException):
+            # Known Sanic exceptions
+            status_code = exception.status_code
+            error_message = str(exception)
+        elif isinstance(exception, DBAPIError):
+            # Database errors
+            status_code = 500
+            error_message = "A database error occurred."
+        else:
+            # Any other exception
+            status_code = 500
+            error_message = "An unexpected error occurred."
+        
+        # In development mode, include more details for debugging
+        if ENV != "prod":
+            error_details = {
+                "error_type": error_type,
+                "error_message": error_msg,
+                "error_id": error_uuid
+            }
+        else:
+            error_details = {
+                "error_id": error_uuid
+            }
+        
+        # Return JSON response with error details
+        return json_response({
+            "status": "error",
+            "message": error_message,
+            "details": error_details
+        }, status=status_code)
 
-# Configure static file serving - use absolute path to avoid issues
-app_dir = os.path.dirname(os.path.abspath(__file__))
-static_folder = os.path.join(app_dir, 'static')
-templates_folder = os.path.join(app_dir, 'templates')
-data_folder = os.path.join(app_dir, 'data')
+# Initialize Sanic app with custom error handler
+app = Sanic(CONFIG["app_name"], error_handler=CustomErrorHandler())
+
+# Get paths from configuration
+static_folder = CONFIG["static_folder"]
+templates_folder = CONFIG["templates_folder"]
+data_folder = CONFIG["data_folder"]
 
 # Create data directory if it doesn't exist
 os.makedirs(data_folder, exist_ok=True)
@@ -118,9 +193,11 @@ DEEPSEEK_MODEL = "deepseek-chat"
 USE_MOCK_RESPONSE = not DEEPSEEK_API_KEY
 
 # Print debug information about API configuration
-print(f"DEEPSEEK_API_KEY: {'[SET]' if DEEPSEEK_API_KEY else '[NOT SET]'}")
-print(f"USE_MOCK_RESPONSE: {USE_MOCK_RESPONSE}")
-print(f"API MODEL: {DEEPSEEK_MODEL}")
+logger.info(f"Environment: {os.environ.get('TIME_CAPSULE_ENV', 'dev')}")
+logger.info(f"Database URL: {get_db_url()}")
+logger.info(f"DEEPSEEK_API_KEY: {'[SET]' if DEEPSEEK_API_KEY else '[NOT SET]'}")
+logger.info(f"USE_MOCK_RESPONSE: {USE_MOCK_RESPONSE}")
+logger.info(f"API MODEL: {DEEPSEEK_MODEL}")
 
 # Initialize users file if it doesn't exist
 if not os.path.exists(users_file):
@@ -416,7 +493,47 @@ async def create_entry(request):
 
 @app.route('/health')
 async def health_check(request):
-    return text("OK")
+    """Health check endpoint for monitoring."""
+    try:
+        health_status = {
+            "status": "ok",
+            "version": "1.0.0",
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "environment": ENV,
+            "checks": {
+                "database": "pending",
+                "api": "pending"
+            }
+        }
+        
+        # Check database connection
+        try:
+            async with async_session() as session:
+                stmt = select(User)
+                result = await session.execute(stmt)
+                # Just test the connection, don't need the results
+                health_status["checks"]["database"] = "ok"
+        except Exception as e:
+            logger.error(f"Health check - Database connection failed: {str(e)}")
+            health_status["checks"]["database"] = "error"
+            health_status["status"] = "error"
+        
+        # Check API configuration if needed
+        if get_secret("DEEPSEEK_API_KEY") or os.environ.get("DEEPSEEK_API_KEY"):
+            health_status["checks"]["api"] = "ok"
+        else:
+            health_status["checks"]["api"] = "warning"
+        
+        # Return health status with appropriate status code
+        status_code = 200 if health_status["status"] == "ok" else 503
+        return json_response(health_status, status=status_code)
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return json_response({
+            "status": "error",
+            "message": "Health check failed",
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }, status=500)
 
 @app.route('/api/info')
 async def api_info(request):
@@ -774,7 +891,10 @@ async def get_users(request):
     """Get all users (admin only)."""
     # Check admin token
     admin_token = request.headers.get('X-Admin-Token')
-    if admin_token != "admin123":  # Hard-coded password for development only
+    admin_pwd = get_secret("ADMIN_PASSWORD", "admin123")  # Fallback for development
+    
+    if admin_token != admin_pwd:
+        logger.warning(f"Unauthorized admin access attempt")
         return json_response({"error": "Unauthorized"}, status=401)
     
     try:
@@ -793,7 +913,10 @@ async def delete_user(request, user_uuid):
     """Delete a user and all their associated data (admin only)."""
     # Check admin token
     admin_token = request.headers.get('X-Admin-Token')
-    if admin_token != "admin123":  # Hard-coded password for development only
+    admin_pwd = get_secret("ADMIN_PASSWORD", "admin123")  # Fallback for development
+    
+    if admin_token != admin_pwd:
+        logger.warning(f"Unauthorized admin access attempt")
         return json_response({"error": "Unauthorized"}, status=401)
     
     try:
@@ -829,7 +952,10 @@ async def get_sessions(request):
     """Get all chat sessions (admin only)."""
     # Check admin token
     admin_token = request.headers.get('X-Admin-Token')
-    if admin_token != "admin123":  # Hard-coded password for development only
+    admin_pwd = get_secret("ADMIN_PASSWORD", "admin123")  # Fallback for development
+    
+    if admin_token != admin_pwd:
+        logger.warning(f"Unauthorized admin access attempt")
         return json_response({"error": "Unauthorized"}, status=401)
     
     try:
@@ -857,7 +983,10 @@ async def delete_session(request, session_id):
     """Delete a chat session and all its messages (admin only)."""
     # Check admin token
     admin_token = request.headers.get('X-Admin-Token')
-    if admin_token != "admin123":  # Hard-coded password for development only
+    admin_pwd = get_secret("ADMIN_PASSWORD", "admin123")  # Fallback for development
+    
+    if admin_token != admin_pwd:
+        logger.warning(f"Unauthorized admin access attempt")
         return json_response({"error": "Unauthorized"}, status=401)
     
     try:
@@ -883,18 +1012,220 @@ async def intro(request):
         logger.error(f"Error serving intro page: {str(e)}")
         return html("<h1>Error loading page</h1><p>Please try again later.</p>")
 
-# Start the server if this file is run directly
-if __name__ == "__main__":
-    import sys
-    # Use default values if command line arguments are not provided
-    host = sys.argv[1] if len(sys.argv) > 1 else "0.0.0.0"
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8080
+@app.route('/api/diary/summarize/<date>')
+async def summarize_diary_entries(request, date):
+    """
+    Summarize all diary entries for a specific date.
     
+    Args:
+        request: The request object
+        date: The date to summarize in YYYY-MM-DD format
+        
+    Returns:
+        JSON response with summarization status
+    """
+    # Get user UUID from header
+    user_uuid = request.headers.get('X-User-UUID')
+    
+    # Validate user UUID
+    if not user_uuid:
+        return json_response({
+            "status": "error",
+            "message": "Missing user UUID in header",
+            "error_code": "MISSING_USER_UUID"
+        }, status=400)
+    
+    # Validate date format
+    try:
+        # Validate date format (YYYY-MM-DD)
+        datetime.datetime.strptime(date, '%Y-%m-%d')
+    except ValueError:
+        return json_response({
+            "status": "error",
+            "message": "Invalid date format. Use YYYY-MM-DD",
+            "error_code": "INVALID_DATE_FORMAT"
+        }, status=400)
+    
+    try:
+        async with async_session() as session:
+            # Get all entries for the user on the specified date
+            entries = await DiaryDB.get_entries_by_date(session, user_uuid, date)
+            
+            if not entries:
+                return json_response({
+                    "status": "error",
+                    "message": f"No diary entries found for date {date}",
+                    "error_code": "NO_ENTRIES_FOUND"
+                }, status=404)
+            
+            # Format entries for the LLM prompt
+            entries_text = ""
+            for i, entry in enumerate(entries, 1):
+                entries_text += f"Entry {i} - {entry.title}:\n{entry.content}\n\n"
+            
+            # Create prompt for the LLM
+            prompt = f"""
+            You are a helpful assistant tasked with summarizing a person's diary entries for a specific day ({date}).
+            
+            Below are all diary entries from that day:
+            
+            {entries_text}
+            
+            Please provide a comprehensive summary of these diary entries, highlighting the key events, emotions, and thoughts from the day.
+            The summary should be around 200-300 words, be written in first person as if the diary owner is reflecting on their day, and maintain the emotional tone of the original entries.
+            """
+            
+            # Get response from LLM
+            from utils.llm_client import llm_response
+            
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant that summarizes diary entries."},
+                {"role": "user", "content": prompt}
+            ]
+            
+            # Get the user for potential personalization
+            user = await UserDB.get_user_by_uuid(session, user_uuid)
+            
+            # Generate summary
+            summary_response = await llm_response(
+                messages=messages,
+                model="deepseek-chat",
+                temperature=0.7,
+                max_tokens=500
+            )
+            
+            # Save summary to database
+            summary = await DiaryDB.create_or_update_summary(
+                session, 
+                user_uuid, 
+                date, 
+                summary_response
+            )
+            
+            return json_response({
+                "status": "success",
+                "message": "Diary entries summarized successfully",
+                "data": {
+                    "date": date,
+                    "summary": summary.summary,
+                    "summary_id": summary.summary_uuid,
+                    "entry_count": len(entries)
+                }
+            })
+            
+    except Exception as e:
+        logger.error(f"Error summarizing diary entries: {str(e)}", exc_info=True)
+        return json_response({
+            "status": "error",
+            "message": "An error occurred while summarizing diary entries",
+            "error_code": "SUMMARIZATION_ERROR"
+        }, status=500)
+
+@app.route('/api/diary/summary/<date>')
+async def get_diary_summary(request, date):
+    """
+    Get the summary of diary entries for a specific date.
+    
+    Args:
+        request: The request object
+        date: The date to get the summary for in YYYY-MM-DD format
+        
+    Returns:
+        JSON response with the summary
+    """
+    # Get user UUID from header
+    user_uuid = request.headers.get('X-User-UUID')
+    
+    # Validate user UUID
+    if not user_uuid:
+        return json_response({
+            "status": "error",
+            "message": "Missing user UUID in header",
+            "error_code": "MISSING_USER_UUID"
+        }, status=400)
+    
+    # Validate date format
+    try:
+        # Validate date format (YYYY-MM-DD)
+        datetime.datetime.strptime(date, '%Y-%m-%d')
+    except ValueError:
+        return json_response({
+            "status": "error",
+            "message": "Invalid date format. Use YYYY-MM-DD",
+            "error_code": "INVALID_DATE_FORMAT"
+        }, status=400)
+    
+    try:
+        async with async_session() as session:
+            # Get summary for the date
+            summary = await DiaryDB.get_summary_by_date(session, user_uuid, date)
+            
+            if not summary:
+                return json_response({
+                    "status": "error",
+                    "message": f"No summary found for date {date}",
+                    "error_code": "NO_SUMMARY_FOUND"
+                }, status=404)
+            
+            # Return summary
+            return json_response({
+                "status": "success",
+                "data": summary.to_dict()
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting diary summary: {str(e)}", exc_info=True)
+        return json_response({
+            "status": "error",
+            "message": "An error occurred while retrieving the diary summary",
+            "error_code": "RETRIEVAL_ERROR"
+        }, status=500)
+
+# Main entry point
+if __name__ == '__main__':
+    # Create argument parser
+    parser = argparse.ArgumentParser(description='Time Capsule Application Server')
+    parser.add_argument('--env', type=str, choices=['dev', 'prod', 'test'], 
+                        default=os.environ.get('TIME_CAPSULE_ENV', 'dev'),
+                        help='Application environment (dev, prod, test)')
+    parser.add_argument('--host', type=str, default='0.0.0.0', 
+                        help='Host to listen on')
+    parser.add_argument('--port', type=int, default=8000, 
+                        help='Port to listen on')
+    parser.add_argument('--debug', action='store_true', 
+                        help='Enable debug mode')
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Set environment variable for configuration
+    os.environ['TIME_CAPSULE_ENV'] = args.env
+    
+    # Log startup information
+    logger.info(f"Starting Time Capsule in {args.env.upper()} mode")
+    logger.info(f"Server will listen on {args.host}:{args.port}")
+    
+    # Initialize database before starting the server
+    @app.listener('before_server_start')
+    async def initialize_db(app, loop):
+        logger.info("Initializing database...")
+        try:
+            await init_db()
+            logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initializing database: {str(e)}")
+            # Consider fatal error handling here
+    
+    # Register blueprints
+    app.blueprint(chat_bp)
+    app.blueprint(contacts_bp)
+    
+    # Start the server
     app.run(
-        host=host, 
-        port=port, 
-        debug=True,
-        auto_reload=True
+        host=args.host,
+        port=args.port,
+        debug=args.debug,
+        auto_reload=args.debug
     )
 
 # Mock function for LLM API call
@@ -1299,3 +1630,91 @@ async def llm_response(user_message, user_data=None, session_id=None, db_session
     # Otherwise use DeepSeek API
     logger.info("Using DeepSeek API for response")
     return await deepseek_chat_completion(user_message, user_data, session_id, db_session)
+
+@app.middleware('request')
+async def rate_limit_middleware(request):
+    """Rate limit middleware to prevent abuse."""
+    # Skip rate limiting if disabled
+    if not RATE_LIMIT["enabled"]:
+        return None
+    
+    # Skip rate limiting for non-API routes
+    if not request.path.startswith('/api/'):
+        return None
+    
+    # Get client IP
+    client_ip = request.remote_addr or request.ip
+    
+    # Skip rate limiting for whitelisted IPs
+    if client_ip in RATE_LIMIT["whitelist"]:
+        return None
+    
+    # Determine rate limit based on path
+    if request.path.startswith('/api/admin'):
+        limit = RATE_LIMIT["admin_rate"]
+    elif request.path.startswith('/api/login') or request.path.endswith('/login'):
+        limit = RATE_LIMIT["login_rate"]
+    else:
+        limit = RATE_LIMIT["default_rate"]
+    
+    # Generate key
+    key = f"{client_ip}:{request.path.split('/')[2] if len(request.path.split('/')) > 2 else 'root'}"
+    
+    # Get current time (minute resolution)
+    current_time = int(datetime.datetime.now().timestamp() // 60)
+    
+    # Initialize or cleanup expired entries
+    if key not in rate_limit_storage or rate_limit_storage[key]["time"] != current_time:
+        rate_limit_storage[key] = {"time": current_time, "count": 0}
+    
+    # Increment request count
+    rate_limit_storage[key]["count"] += 1
+    
+    # Check if rate limit is exceeded
+    if rate_limit_storage[key]["count"] > limit:
+        logger.warning(f"Rate limit exceeded for {key}")
+        return json_response({
+            "status": "error",
+            "message": "Rate limit exceeded. Please try again later.",
+            "error_code": "RATE_LIMIT_EXCEEDED"
+        }, status=429)
+    
+    return None
+
+# Register error handlers for specific scenarios
+@app.exception(NotFound)
+async def handle_not_found(request, exception):
+    """Handle 404 errors."""
+    # Check if this is an API request
+    if request.path.startswith('/api/'):
+        return json_response({
+            "status": "error",
+            "message": "The requested resource was not found.",
+            "error_code": "NOT_FOUND"
+        }, status=404)
+    
+    # For non-API routes, serve the 404 page
+    try:
+        async with aiofiles.open(os.path.join(templates_folder, '404.html'), mode='r') as f:
+            content = await f.read()
+            return html(content, status=404)
+    except:
+        return html("<h1>404 - Not Found</h1><p>The requested resource could not be found.</p>", status=404)
+
+@app.exception(Unauthorized)
+async def handle_unauthorized(request, exception):
+    """Handle 401 errors."""
+    return json_response({
+        "status": "error",
+        "message": "Authentication required.",
+        "error_code": "UNAUTHORIZED"
+    }, status=401)
+
+@app.exception(InvalidUsage)
+async def handle_invalid_usage(request, exception):
+    """Handle 400 errors."""
+    return json_response({
+        "status": "error",
+        "message": "Invalid request: " + str(exception),
+        "error_code": "INVALID_REQUEST"
+    }, status=400)

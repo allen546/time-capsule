@@ -548,19 +548,39 @@
             const urlParams = new URLSearchParams(window.location.search);
             const moodParam = urlParams.get('mood');
             
+            console.log(`URL mood parameter detected: ${moodParam}`);
+            
             if (moodParam) {
                 const moodButtons = document.querySelectorAll('.mood-button');
+                let found = false;
+                
                 moodButtons.forEach(button => {
-                    // 如果数据属性匹配URL的心情参数或翻译匹配
+                    // 如果数据属性匹配URL的心情参数
                     if (button.dataset.mood === moodParam) {
-                        button.click(); // 自动点击该按钮
+                        console.log(`Found matching mood button: ${moodParam}`);
+                        // 移除其他按钮的选中状态
+                        moodButtons.forEach(btn => btn.classList.remove('selected'));
+                        // 添加当前按钮的选中状态
+                        button.classList.add('selected');
+                        // 设置全局选中的心情
+                        selectedMood = moodParam;
+                        found = true;
+                        
+                        // 模拟焦点到文本区域，提示用户输入
+                        setTimeout(() => {
+                            document.getElementById('activity-input').focus();
+                        }, 100);
                     }
                 });
+                
+                if (!found) {
+                    console.warn(`No matching mood button found for: ${moodParam}`);
+                }
             }
         }
         
         // 页面加载时处理URL参数
-        window.addEventListener('load', handleUrlParams);
+        window.addEventListener('DOMContentLoaded', handleUrlParams);
         
         // 心情选择
         let selectedMood = null;

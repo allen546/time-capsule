@@ -284,30 +284,44 @@
     </div>
     
     <script>
-        // 硬编码密码 (仅用于开发环境)
-        const ADMIN_PASSWORD = "admin123"; 
-        
         document.getElementById('backButton').addEventListener('click', function() {
             window.location.href = '/home';
         });
         
         // 登录表单提交
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const password = document.getElementById('password').value;
             
-            if (password === ADMIN_PASSWORD) {
-                // 登录成功，显示管理面板
-                document.getElementById('loginContainer').classList.add('hidden');
-                document.getElementById('adminContainer').classList.remove('hidden');
+            try {
+                // First attempt with entered password
+                const testResponse = await fetch('/api/admin/users', {
+                    headers: {
+                        'X-Admin-Token': password
+                    }
+                });
                 
-                // 加载数据
-                loadUsers();
-                loadSessions();
-            } else {
-                // 登录失败，显示错误信息
+                if (testResponse.ok) {
+                    // 登录成功，显示管理面板
+                    document.getElementById('loginContainer').classList.add('hidden');
+                    document.getElementById('adminContainer').classList.remove('hidden');
+                    
+                    // Store password for this session (in memory only)
+                    sessionStorage.setItem('adminToken', password);
+                    
+                    // 加载数据
+                    loadUsers();
+                    loadSessions();
+                } else {
+                    // 登录失败，显示错误信息
+                    const errorElement = document.getElementById('errorMessage');
+                    errorElement.textContent = "密码错误";
+                    errorElement.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('登录错误:', error);
                 const errorElement = document.getElementById('errorMessage');
-                errorElement.textContent = "密码错误";
+                errorElement.textContent = "登录失败，请稍后再试";
                 errorElement.classList.remove('hidden');
             }
         });
@@ -325,16 +339,29 @@
             }, 5000);
         }
         
+        // Get admin token from session storage
+        function getAdminToken() {
+            return sessionStorage.getItem('adminToken');
+        }
+        
         // 加载用户列表
         async function loadUsers() {
             try {
                 const response = await fetch('/api/admin/users', {
                     headers: {
-                        'X-Admin-Token': ADMIN_PASSWORD
+                        'X-Admin-Token': getAdminToken()
                     }
                 });
                 
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        // Unauthorized - return to login screen
+                        document.getElementById('loginContainer').classList.remove('hidden');
+                        document.getElementById('adminContainer').classList.add('hidden');
+                        sessionStorage.removeItem('adminToken');
+                        showAlert('会话已过期，请重新登录', 'warning');
+                        return;
+                    }
                     throw new Error('加载用户数据失败');
                 }
                 
@@ -402,11 +429,15 @@
             try {
                 const response = await fetch('/api/admin/sessions', {
                     headers: {
-                        'X-Admin-Token': ADMIN_PASSWORD
+                        'X-Admin-Token': getAdminToken()
                     }
                 });
                 
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        // Unauthorized - handled by loadUsers
+                        return;
+                    }
                     throw new Error('加载会话数据失败');
                 }
                 
@@ -459,11 +490,19 @@
                 const response = await fetch(`/api/admin/users/${uuid}?mode=${mode}`, {
                     method: 'DELETE',
                     headers: {
-                        'X-Admin-Token': ADMIN_PASSWORD
+                        'X-Admin-Token': getAdminToken()
                     }
                 });
                 
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        // Unauthorized - return to login screen
+                        document.getElementById('loginContainer').classList.remove('hidden');
+                        document.getElementById('adminContainer').classList.add('hidden');
+                        sessionStorage.removeItem('adminToken');
+                        showAlert('会话已过期，请重新登录', 'warning');
+                        return;
+                    }
                     throw new Error('删除用户失败');
                 }
                 
@@ -485,7 +524,7 @@
                 const response = await fetch(`/api/admin/sessions/${sessionId}`, {
                     method: 'DELETE',
                     headers: {
-                        'X-Admin-Token': ADMIN_PASSWORD
+                        'X-Admin-Token': getAdminToken()
                     }
                 });
                 
