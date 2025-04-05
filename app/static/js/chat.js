@@ -392,10 +392,10 @@ async function loadChatMessages(sessionId) {
                 const isError = content && content.startsWith('Error:');
                 const isMock = content && (content.startsWith('Echo:') || content.includes('this is just a mock response'));
                 
-                logDebug(`Adding message to chat: ${isUser ? 'User' : 'AI'}, ${new Date(timestamp).toISOString()}, ${content.substring(0, 30)}...`);
+                logDebug(`Adding message to chat: ${isUser ? 'User' : 'AI'}, ${timestamp}, ${content.substring(0, 30)}...`);
                 
-                // Add with appropriate styling
-                addMessageToChat(content, isUser, new Date(timestamp), isError, isMock);
+                // Add with appropriate styling - pass the timestamp string directly to formatTime
+                addMessageToChat(content, isUser, timestamp, isError, isMock);
             }
             
             // Mark chat as loaded to trigger CSS auto-scroll
@@ -578,7 +578,20 @@ function formatMessage(message) {
  * Format timestamp as HH:MM
  */
 function formatTime(date) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Check if date is a string (ISO format from server)
+    if (typeof date === 'string') {
+        date = new Date(date);
+    }
+    
+    // Adjust to Asia/Shanghai timezone (UTC+8)
+    const options = { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'Asia/Shanghai'
+    };
+    
+    return date.toLocaleTimeString([], options);
 }
 
 /**
@@ -1006,7 +1019,7 @@ async function sendUserMessage(message) {
         addMessageToChat(
             responseText, 
             false, 
-            new Date(aiResponse.timestamp || aiResponse.created_at), 
+            aiResponse.timestamp || aiResponse.created_at, 
             isError, 
             isMock
         );

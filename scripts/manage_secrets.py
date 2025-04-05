@@ -16,7 +16,7 @@ import string
 from pathlib import Path
 
 # Get application directory
-APP_DIR = Path(__file__).resolve().parent / "app"
+APP_DIR = Path(__file__).resolve().parent.parent / "app"
 SECRETS_DIR = APP_DIR / "secrets"
 ENV_FILE = Path(".env")
 

@@ -20,8 +20,8 @@ An interactive web application that allows elderly users to converse with a simu
 ## 🛠️ Tech Stack
 
 ### Backend
-- **Framework**: Sanic/FastAPI with Python
-- **Database**: SQLite (Tortoise ORM)
+- **Framework**: Sanic with Python
+- **Database**: SQLite/PostgreSQL with SQLAlchemy
 - **Authentication**: JWT tokens
 - **AI Integration**: Custom prompt engineering with third-party AI providers
 
@@ -38,6 +38,31 @@ An interactive web application that allows elderly users to converse with a simu
 - Node.js and npm (for frontend development)
 
 ### Installation
+
+#### Automatic Installation
+
+The easiest way to install Time Capsule is using the provided installation script:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/time-capsule.git
+cd time-capsule
+
+# Run the installation script
+./scripts/install.sh
+```
+
+The script will:
+- Check for Python 3.8+
+- Create and activate a virtual environment
+- Install all dependencies
+- Set up necessary directories
+- Create a default configuration file
+- Optionally generate self-signed TLS certificates
+
+#### Manual Installation
+
+If you prefer to install manually:
 
 1. Clone the repository
    ```bash
@@ -58,10 +83,10 @@ An interactive web application that allows elderly users to converse with a simu
 
 4. Run the application
    ```bash
-   python run.py
+   ./scripts/start.sh
    ```
 
-5. Open your browser and navigate to `http://localhost:8080`
+5. Open your browser and navigate to `http://localhost:8000`
 
 ## 📋 Usage Flow
 
@@ -75,16 +100,29 @@ An interactive web application that allows elderly users to converse with a simu
 ```
 time-capsule/
 ├── app/                  # Backend application code
-│   ├── ai.py             # AI integration and prompt engineering
-│   ├── db.py             # Database models and utilities
-│   ├── main.py           # Main application entry point and routes
-│   ├── models.py         # Data models and schemas
-│   └── questionnaire.py  # Questionnaire processing logic
-├── static/               # Frontend static assets
-│   ├── css/              # Stylesheets with accessibility features
-│   ├── js/               # JavaScript for frontend functionality
-│   └── *.html            # HTML templates
-├── run.py                # Server startup script
+│   ├── data/             # Data files and database
+│   ├── routes/           # API routes and endpoints
+│   ├── static/           # Frontend static assets
+│   ├── templates/        # HTML templates
+│   ├── utils/            # Utility functions
+│   ├── app.py            # Main application entry point
+│   ├── config.py         # Configuration settings
+│   └── db.py             # Database models and utilities
+├── cert/                 # TLS certificates
+├── scripts/              # Helper scripts
+│   ├── generate_test_certs.sh  # Generate self-signed certificates
+│   ├── install.sh        # Installation script
+│   ├── prod_start.sh     # Start in production mode
+│   ├── run_production.sh # User-friendly production launcher
+│   ├── set_admin_password.sh # Set admin password
+│   ├── start.sh          # Development startup script
+│   ├── test_tls.sh       # Test TLS configuration
+│   └── test_https_connection.sh # Test HTTPS connections
+├── .env.example          # Example environment variables
+├── .env.production       # Production environment variables
+├── Dockerfile            # Docker configuration
+├── docker-compose.yml    # Docker Compose configuration
+├── PRODUCTION.md         # Production deployment guide
 ├── requirements.txt      # Python dependencies
 └── README.md             # Project documentation
 ```
@@ -131,4 +169,49 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## TLS/SSL Security
+
+The application supports secure HTTPS connections in production mode using TLS/SSL certificates.
+
+### Testing with Self-Signed Certificates
+
+For development and testing, you can generate self-signed certificates:
+
+```bash
+# Generate test certificates
+./scripts/generate_test_certs.sh
+
+# Run the application with TLS on port 8443
+./scripts/test_tls.sh
+```
+
+You can then test the HTTPS connection in a separate terminal:
+
+```bash
+# Test HTTPS connection (default port 8443)
+./scripts/test_https_connection.sh
+
+# Or specify a custom port
+./scripts/test_https_connection.sh 443
+```
+
+### Production TLS Setup
+
+For production deployment, follow these steps:
+
+1. Obtain proper TLS certificates from a trusted authority like Let's Encrypt
+2. Place the certificates in the `cert/` directory:
+   - `fullchain.pem`: Server certificate + intermediate certificates
+   - `privkey.pem`: Private key
+3. Set the admin password:
+   ```bash
+   ./scripts/set_admin_password.sh
+   ```
+4. Run the application in production mode:
+   ```bash
+   ./scripts/run_production.sh
+   ```
+
+For more detailed instructions, see [PRODUCTION.md](PRODUCTION.md) 

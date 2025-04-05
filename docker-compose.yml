@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # Application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    volumes:
+      - ./cert:/app/cert:ro
+      - app_data:/app/app/data
+      - app_logs:/app/logs
+    environment:
+      - DB_HOST=db
+      - DB_USER=timecapsule
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=timecapsule
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    depends_on:
+      - db
+    networks:
+      - app_network
+    # Ensure data directory is created with the right permissions
+    command: >
+      bash -c "mkdir -p /app/app/data &&
+               chmod 750 /app/app/data &&
+               ./prod_start.sh"
+
+  # Database service
+  db:
+    image: postgres:14-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=timecapsule
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=timecapsule
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    # Health check for PostgreSQL
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U timecapsule"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional web server for SSL termination (if needed)
+  # nginx:
+  #   image: nginx:alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/conf:/etc/nginx/conf.d:ro
+  #     - ./cert:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - app
+  #   networks:
+  #     - app_network
+
+volumes:
+  app_data:
+  app_logs:
+  postgres_data:
+
+networks:
+  app_network:
+    driver: bridge 

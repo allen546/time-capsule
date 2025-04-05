@@ -7,18 +7,22 @@ This script starts the Time Capsule server with Sanic framework.
 
 import logging
 import os
+import pathlib
 import uuid
 import json
 import datetime
 import aiohttp
 import asyncio
 import ssl
+import sys
 from sanic import Sanic
 from sanic.response import html, json as json_response, file, redirect, text
 from sanic.log import logger
 import aiofiles
 from functools import wraps
-from websockets.exceptions import WebSocketProtocolError
+# Fix for websockets 15+ deprecation warning
+# from websockets.exceptions import WebSocketProtocolError
+from websockets.exceptions import ProtocolError as WebSocketProtocolError
 from sqlalchemy.exc import DBAPIError
 from typing import Dict, List, Optional, Union, Any, Tuple
 import argparse
@@ -27,8 +31,17 @@ import traceback
 from sanic.handlers import ErrorHandler
 from sanic.exceptions import SanicException, NotFound, Unauthorized, InvalidUsage
 
+# Get base directory for correct imports
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)  # Add app directory to path
+
 # Import configuration
-from config import CONFIG, get_db_url, DATA_DIR, get_secret, ENV
+try:
+    from config import CONFIG, get_db_url, DATA_DIR, get_secret, ENV
+except ImportError:
+    # Try with explicit path
+    sys.path.insert(0, BASE_DIR)
+    from config import CONFIG, get_db_url, DATA_DIR, get_secret, ENV
 
 # Import database module
 from db import init_db, get_session, DiaryDB, UserDB, ChatDB, async_session
@@ -67,15 +80,19 @@ def configure_logging():
         ]
     )
 
-    # Reduce noise from Sanic loggers
-    logging.getLogger('sanic.access').setLevel(logging.ERROR)
+    # Disable Sanic access logging and other noisy loggers
+    logging.getLogger('sanic.access').setLevel(logging.CRITICAL)  # Completely disable access logging
     logging.getLogger('sanic.server').setLevel(logging.ERROR)
     logging.getLogger('sanic.root').setLevel(logging.ERROR)
     logging.getLogger('sanic.error').setLevel(logging.WARNING)
     
+    # Disable API logging
+    api_logger = logging.getLogger('api')
+    api_logger.setLevel(logging.ERROR)  # Set to ERROR to disable most API logging
+    
     # Set up chat-related loggers with detailed logging - WARN level to catch profile checks
     websocket_logger = logging.getLogger('websocket')
-    websocket_logger.setLevel(logging.INFO)
+    websocket_logger.setLevel(logging.WARNING)  # Reduce websocket logging
     
     # Create a detailed formatter for chat logs
     detailed_formatter = logging.Formatter(
@@ -100,13 +117,9 @@ def configure_logging():
     chat_handler.setLevel(logging.WARNING)
     chat_logger.addHandler(chat_handler)
     
-    # Set up non-chat API loggers with minimal logging
-    api_logger = logging.getLogger('api')
-    api_logger.setLevel(logging.INFO)
-    
     # Set up specific loggers for non-chat components
     diary_logger = logging.getLogger('diary')
-    diary_logger.setLevel(logging.INFO)  # Changed from WARNING to INFO
+    diary_logger.setLevel(logging.WARNING)  # Changed to WARNING to reduce logs
     
     profile_logger = logging.getLogger('profile')
     profile_logger.setLevel(logging.WARNING)  # Only log warnings and errors
@@ -114,11 +127,11 @@ def configure_logging():
     contacts_logger = logging.getLogger('contacts')
     contacts_logger.setLevel(logging.WARNING)  # Only log warnings and errors
     
-    # Get the application logger，，
+    # Get the application logger
     app_logger = logging.getLogger(__name__)
     
     # Log configuration completed
-    app_logger.info("Logging configured")
+    app_logger.info("Logging configured - Access and API logging disabled")
     return app_logger
 
 # Configure logging
@@ -194,10 +207,12 @@ USE_MOCK_RESPONSE = not DEEPSEEK_API_KEY
 
 # Print debug information about API configuration
 logger.info(f"Environment: {os.environ.get('TIME_CAPSULE_ENV', 'dev')}")
-logger.info(f"Database URL: {get_db_url()}")
-logger.info(f"DEEPSEEK_API_KEY: {'[SET]' if DEEPSEEK_API_KEY else '[NOT SET]'}")
-logger.info(f"USE_MOCK_RESPONSE: {USE_MOCK_RESPONSE}")
-logger.info(f"API MODEL: {DEEPSEEK_MODEL}")
+# Disable verbose logging
+if ENV == "prod":
+    logger.info(f"Database URL: {get_db_url()}")
+    logger.info(f"DEEPSEEK_API_KEY: {'[SET]' if DEEPSEEK_API_KEY else '[NOT SET]'}")
+    logger.info(f"USE_MOCK_RESPONSE: {USE_MOCK_RESPONSE}")
+    logger.info(f"API MODEL: {DEEPSEEK_MODEL}")
 
 # Initialize users file if it doesn't exist
 if not os.path.exists(users_file):
@@ -211,50 +226,15 @@ async def inject_session(request):
 
 @app.middleware('request')
 async def log_request_details(request):
-    """Log detailed information about incoming requests."""
-    # Create a request ID for tracking
+    """Log minimal information about incoming requests."""
+    # Create a request ID for tracking (still needed for error correlation)
     request_id = str(uuid.uuid4())[:8]
     request.ctx.request_id = request_id
     
     # Store start time for performance monitoring
     request.ctx.request_start_time = datetime.datetime.now()
     
-    # Get path and method
-    path = request.path
-    method = request.method
-    
-    # Log basic request info for all requests
-    logger.info(f"[REQ:{request_id}] {method} {path}")
-    
-    # Only log detailed debug information for chat-related paths
-    if '/chat' in path or path.startswith('/api/chat'):
-        # Log headers (especially authentication headers)
-        headers = dict(request.headers)
-        sanitized_headers = headers.copy()
-        
-        # Remove sensitive information from logs
-        for key in headers:
-            if 'auth' in key.lower() or 'key' in key.lower() or 'token' in key.lower():
-                sanitized_headers[key] = "[REDACTED]"
-        
-        # Log important headers for debugging
-        important_headers = ['x-user-uuid', 'x-client-id', 'content-type', 'user-agent']
-        header_info = {k: headers.get(k, 'N/A') for k in important_headers}
-        logger.info(f"[REQ:{request_id}] Headers: {header_info}")
-        
-        # For API chat routes, log more details
-        if path.startswith('/api/chat'):
-            # Log query parameters
-            if request.args:
-                logger.info(f"[REQ:{request_id}] Query params: {dict(request.args)}")
-            
-            # For chat message endpoints, log additional details
-            if 'chat/sessions' in path and '/messages' in path:
-                user_uuid = headers.get('x-user-uuid', 'MISSING')
-                user_uuid_display = user_uuid[:8] if user_uuid and user_uuid != 'MISSING' else 'MISSING'
-                session_id = path.split('/')[-2] if '/sessions/' in path else 'unknown'
-                logger.info(f"[REQ:{request_id}] Chat request for session {session_id} from user {user_uuid_display}")
-    
+    # Only log serious errors and authentication failures
     return None
 
 @app.middleware('response')
@@ -265,59 +245,31 @@ async def close_session(request, response):
 
 @app.middleware('response')
 async def log_response_details(request, response):
-    """Log details about the response."""
-    # Get request ID from context
-    request_id = getattr(request.ctx, 'request_id', 'unknown')
-    
-    # Get path, method and status
-    status = response.status
-    path = request.path
-    method = request.method
-    
-    # Calculate response time if we have request_start_time
-    timing_info = ""
-    if hasattr(request.ctx, 'request_start_time'):
-        elapsed = (datetime.datetime.now() - request.ctx.request_start_time).total_seconds()
-        timing_info = f" in {elapsed:.2f}s"
-    
-    # Log basic response info for all requests
-    logger.info(f"[RES:{request_id}] {method} {path} → {status}{timing_info}")
-    
-    # For error responses, always log details
-    if status >= 400:
-        # For chat-related paths, log more detailed error information
-        if '/chat' in path or path.startswith('/api/chat'):
-            # For specific paths with permissions issues, log more details
-            if status == 403 and path.startswith('/api/chat/sessions/'):
-                headers = dict(request.headers)
-                user_uuid = headers.get('x-user-uuid', 'MISSING')
-                logger.warning(f"[ERROR:{request_id}] Permission denied for {user_uuid}")
-                
-                # Log session details for debugging
-                session_id = path.split('/')[4] if len(path.split('/')) > 4 else 'unknown'
-                logger.warning(f"[ERROR:{request_id}] Session access denied: {session_id}")
-                
-                # Store this event for analysis
-                try:
-                    asyncio.create_task(
-                        store_error_event(
-                            error_type="permission_denied", 
-                            user_uuid=user_uuid,
-                            session_id=session_id,
-                            path=path,
-                            headers=headers
-                        )
-                    )
-                except Exception as e:
-                    logger.error(f"[ERROR:{request_id}] Failed to store error event: {str(e)}")
+    """Log minimal details about the response."""
+    # Only log error responses (status >= 500 or auth failures)
+    if response.status >= 500 or response.status == 401 or response.status == 403:
+        # Get request ID from context
+        request_id = getattr(request.ctx, 'request_id', 'unknown')
         
-        # Always log error response bodies regardless of path
-        try:
-            if hasattr(response, 'body'):
-                body = response.body.decode('utf-8')
-                logger.warning(f"[RES:{request_id}] Error response: {body[:200]}")
-        except Exception as e:
-            logger.debug(f"[RES:{request_id}] Could not decode response body: {str(e)}")
+        # Get path, method and status
+        status = response.status
+        path = request.path
+        method = request.method
+        
+        # Calculate response time if we have request_start_time
+        timing_info = ""
+        if hasattr(request.ctx, 'request_start_time'):
+            elapsed = (datetime.datetime.now() - request.ctx.request_start_time).total_seconds()
+            timing_info = f" in {elapsed:.2f}s"
+        
+        # Log error information
+        logger.warning(f"[ERROR:{request_id}] {method} {path} → {status}{timing_info}")
+        
+        # For authentication errors, log minimal details
+        if status in (401, 403) and path.startswith('/api/'):
+            headers = dict(request.headers)
+            user_uuid = headers.get('x-user-uuid', 'MISSING')
+            logger.warning(f"[ERROR:{request_id}] Auth failure for {user_uuid}")
     
     return response
 
@@ -373,26 +325,14 @@ app.blueprint(contacts_bp)
 
 # Event listeners for database initialization
 @app.listener('before_server_start')
-async def setup_db(app, loop):
-    """Initialize database before server starts."""
-    logger.info("Starting database initialization...")
+async def initialize_db(app, loop):
+    logger.info("Initializing database...")
     try:
         await init_db()
         logger.info("Database initialized successfully")
-        
-        # Log database location to help with debugging
-        db_path = os.path.join(data_folder, 'timecapsule.db')
-        logger.info(f"Database location: {db_path}")
-        logger.info(f"Database exists: {os.path.exists(db_path)}")
-        
-        # Log API configuration
-        if USE_MOCK_RESPONSE:
-            logger.warning("DEEPSEEK_API_KEY not set. Using mock LLM responses.")
-        else:
-            logger.info(f"Using DeepSeek API with model: {DEEPSEEK_MODEL}")
     except Exception as e:
-        logger.error(f"Error initializing database: {str(e)}", exc_info=True)
-        raise
+        logger.error(f"Error initializing database: {str(e)}")
+        # Consider fatal error handling here
 
 # Routes
 @app.route('/')
@@ -1276,6 +1216,10 @@ if __name__ == '__main__':
                         help='Port to listen on')
     parser.add_argument('--debug', action='store_true', 
                         help='Enable debug mode')
+    parser.add_argument('--ssl', action='store_true',
+                        help='Enable SSL/TLS')
+    parser.add_argument('--tls-strict-host', action='store_true',
+                        help='Require SNI (Server Name Indication) from clients')
     
     # Parse arguments
     args = parser.parse_args()
@@ -1283,20 +1227,111 @@ if __name__ == '__main__':
     # Set environment variable for configuration
     os.environ['TIME_CAPSULE_ENV'] = args.env
     
+    # Initialize SSL configuration to None
+    ssl_config = None
+    
+    # Check if we should use SSL/TLS
+    if args.ssl or os.environ.get('SSL_DIR') or os.environ.get('SSL_CERT_FILE'):
+        logger.info("Configuring SSL for the application...")
+        
+        # Case 1: SSL directory provided through environment
+        if os.environ.get('SSL_DIR'):
+            ssl_dir = os.environ.get('SSL_DIR')
+            
+            if os.path.isdir(ssl_dir):
+                # Use Sanic's directory-based configuration
+                ssl_config = ssl_dir
+                logger.info(f"Using SSL directory: {ssl_dir}")
+            else:
+                logger.error(f"SSL directory not found: {ssl_dir}")
+                if args.env == 'prod':
+                    logger.critical("Cannot start in production without valid SSL. Exiting.")
+                    sys.exit(1)
+        
+        # Case 2: Explicit certificate and key files
+        elif os.environ.get('SSL_CERT_FILE') and os.environ.get('SSL_KEY_FILE'):
+            cert_file = os.environ.get('SSL_CERT_FILE')
+            key_file = os.environ.get('SSL_KEY_FILE')
+            password = os.environ.get('SSL_KEY_PASSWORD')  # Optional
+            
+            if os.path.exists(cert_file) and os.path.exists(key_file):
+                # Create dict-based SSL configuration
+                ssl_config = {
+                    "cert": cert_file,
+                    "key": key_file
+                }
+                
+                # Add password if provided
+                if password:
+                    ssl_config["password"] = password
+                
+                logger.info("Using certificate and key files")
+            else:
+                logger.error("SSL certificate or key file not found")
+                if args.env == 'prod':
+                    logger.critical("Cannot start in production without valid SSL. Exiting.")
+                    sys.exit(1)
+        
+        # Case 3: --ssl flag with no directory parameter - use default directory
+        else:
+            # Define possible certificate locations in order of preference
+            cert_locations = [
+                os.path.join(BASE_DIR, "cert"),                          # App directory
+                os.path.join(BASE_DIR, "..", "cert"),                    # Project root
+                os.path.join(os.path.expanduser("~"), ".ssl/timecapsule"), # User's home directory
+                "/etc/ssl/timecapsule",                                  # System-wide location
+                "/etc/letsencrypt/live/timecapsule"                      # Let's Encrypt location
+            ]
+            
+            # Check each location for valid certificates
+            ssl_config = None
+            for cert_dir in cert_locations:
+                if (os.path.isdir(cert_dir) and 
+                    os.path.exists(os.path.join(cert_dir, "fullchain.pem")) and 
+                    os.path.exists(os.path.join(cert_dir, "privkey.pem"))):
+                    ssl_config = cert_dir
+                    logger.info(f"Using SSL certificates from: {cert_dir}")
+                    break
+            
+            # If no certificates found in any location
+            if ssl_config is None:
+                logger.warning("SSL enabled but no valid certificates found")
+                
+                if args.env == 'prod':
+                    logger.critical("Cannot start in production without valid SSL. Exiting.")
+                    sys.exit(1)
+    
+    # Production check
+    if args.env == 'prod' and args.port == 443 and ssl_config is None:
+        logger.critical("Running in production on port 443 requires SSL. Exiting.")
+        sys.exit(1)
+    
+    # If TLS strict host is enabled, modify the SSL configuration
+    if args.tls_strict_host and ssl_config:
+        logger.info("TLS strict host enabled (requiring SNI)")
+        
+        # If ssl_config is a string (directory path)
+        if isinstance(ssl_config, str):
+            # Convert to a list with None as the first element
+            ssl_config = [None, ssl_config]
+        # If ssl_config is a dictionary (cert/key pair)
+        elif isinstance(ssl_config, dict):
+            ssl_config = [None, ssl_config]
+            
+        logger.info("SSL configuration updated to require SNI")
+    
     # Log startup information
-    logger.info(f"Starting Time Capsule in {args.env.upper()} mode")
-    logger.info(f"Server will listen on {args.host}:{args.port}")
+    logger.info(f"Starting Time Capsule in {args.env.upper()} mode on {args.host}:{args.port} (SSL: {ssl_config is not None})")
     
     # Initialize database before starting the server
     @app.listener('before_server_start')
     async def initialize_db(app, loop):
-        logger.info("Initializing database...")
         try:
             await init_db()
-            logger.info("Database initialized successfully")
+            logger.info("Database initialized")
         except Exception as e:
-            logger.error(f"Error initializing database: {str(e)}")
-            # Consider fatal error handling here
+            logger.error(f"Database initialization error: {str(e)}")
+            sys.exit(1)
     
     # Register blueprints
     app.blueprint(chat_bp)
@@ -1307,7 +1342,8 @@ if __name__ == '__main__':
         host=args.host,
         port=args.port,
         debug=args.debug,
-        auto_reload=args.debug
+        auto_reload=args.debug,
+        ssl=str(pathlib.Path(os.getcwd()).parent / "cert")
     )
 
 # Mock function for LLM API call
@@ -1577,18 +1613,13 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
         The AI response from DeepSeek API or a fallback response
     """
     request_id = str(uuid.uuid4())[:8]  # Generate a short ID for this request
-    logger.info(f"[API:{request_id}] Starting DeepSeek API request for session {session_id}")
-    logger.info(f"[API:{request_id}] API Key: {'[SET]' if DEEPSEEK_API_KEY else '[NOT SET]'}, USE_MOCK_RESPONSE: {USE_MOCK_RESPONSE}")
-    logger.info(f"[API:{request_id}] Using model: {DEEPSEEK_MODEL}")
     
     try:
         # Set preferred language (default to Chinese)
         language = "zh"
         
         # Format system prompt based on user data
-        logger.info(f"[API:{request_id}] Generating system prompt")
         system_prompt = create_system_prompt(user_data, language)
-        logger.debug(f"[API:{request_id}] System prompt length: {len(system_prompt)} chars")
         
         # Prepare messages list with system prompt
         messages = [{"role": "system", "content": system_prompt}]
@@ -1596,9 +1627,7 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
         # Add conversation history if available
         if session_id and db_session:
             # Get the last 10 messages for context (not including the current one)
-            logger.info(f"[API:{request_id}] Retrieving message history")
             history_messages = await ChatDB.get_messages_by_session(db_session, session_id, limit=10)
-            logger.info(f"[API:{request_id}] Retrieved {len(history_messages)} messages from history")
             
             # Add messages to the context (oldest first)
             for msg in history_messages:
@@ -1608,14 +1637,12 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
                 
                 # Skip the current message if it's in history already
                 if msg.is_user and content.strip() == user_message.strip():
-                    logger.debug(f"[API:{request_id}] Skipping duplicate of current message in history")
                     continue
                     
                 messages.append({"role": role, "content": content})
         
         # Add the current user message if not already in history
         messages.append({"role": "user", "content": user_message})
-        logger.info(f"[API:{request_id}] Final message count for context: {len(messages)}")
         
         # Prepare API request
         headers = {
@@ -1630,19 +1657,12 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
             "max_tokens": 1024
         }
         
-        # Log the API request details
-        logger.info(f"[API:{request_id}] Request URL: {DEEPSEEK_API_URL}")
-        logger.info(f"[API:{request_id}] Request headers: {{'Content-Type': 'application/json', 'Authorization': 'Bearer [REDACTED]'}}")
-        logger.info(f"[API:{request_id}] Request payload model: {payload['model']}")
-        logger.info(f"[API:{request_id}] Request payload message count: {len(payload['messages'])}")
-        
         # Create SSL context to handle certificate verification issues
         ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
         
         # Make API request
-        logger.info(f"[API:{request_id}] Sending request to DeepSeek API with {len(messages)} messages")
         start_time = datetime.datetime.now()
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -1653,8 +1673,6 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
                 ssl=ssl_context
             ) as response:
                 response_time = (datetime.datetime.now() - start_time).total_seconds()
-                logger.info(f"[API:{request_id}] Received response from DeepSeek API in {response_time:.2f} seconds")
-                logger.info(f"[API:{request_id}] Response status code: {response.status}")
                 
                 if response.status != 200:
                     error_text = await response.text()
@@ -1671,22 +1689,18 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
                 
                 # Process successful response
                 result = await response.json()
-                logger.info(f"[API:{request_id}] Successfully received valid JSON response from DeepSeek API")
                 
                 try:
                     content = result["choices"][0]["message"]["content"]
-                    content_preview = content[:50] + ('...' if len(content) > 50 else '')
-                    logger.info(f"[API:{request_id}] Response content: '{content_preview}'")
                     return content
                 except (KeyError, IndexError) as e:
                     logger.error(f"[API:{request_id}] Error extracting content from DeepSeek API response: {e}")
-                    logger.error(f"[API:{request_id}] Response structure: {json.dumps(result)[:200]}...")
                     # Fall back to mock response
                     logger.warning(f"[API:{request_id}] Using mock response as fallback")
                     return await mock_llm_response(user_message, user_data, session_id, db_session)
     
     except Exception as e:
-        logger.error(f"[API:{request_id}] Error in DeepSeek API request: {str(e)}", exc_info=True)
+        logger.error(f"[API:{request_id}] Error in DeepSeek API request: {str(e)}")
         # Fall back to mock response
         logger.warning(f"[API:{request_id}] Using mock response as fallback due to exception")
         return await mock_llm_response(user_message, user_data, session_id, db_session)
@@ -1706,11 +1720,9 @@ async def llm_response(user_message, user_data=None, session_id=None, db_session
     """
     # Use mock response if API key is not set or if explicitly configured to use mock
     if USE_MOCK_RESPONSE:
-        logger.info("Using mock LLM response")
         return await mock_llm_response(user_message, user_data, session_id, db_session)
     
     # Otherwise use DeepSeek API
-    logger.info("Using DeepSeek API for response")
     return await deepseek_chat_completion(user_message, user_data, session_id, db_session)
 
 @app.middleware('request')

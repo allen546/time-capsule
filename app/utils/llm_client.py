@@ -1043,7 +1043,7 @@ async def llm_response(user_message=None, user_data=None, session_id=None, db_se
     # Otherwise, use legacy method with user_message
     if user_message:
         # Use mock response if API key is not set or if explicitly configured to use mock
-        if USE_MOCK_RESPONSE or 1:
+        if USE_MOCK_RESPONSE:
             logger.info("Using mock LLM response")
             return await mock_llm_response(user_message, user_data, session_id, db_session)
         
