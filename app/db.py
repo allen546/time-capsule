@@ -371,12 +371,34 @@ class UserDB:
     
     @staticmethod
     async def reset_user(session, uuid):
-        """Mark a user as reset."""
+        """Mark a user as reset and delete associated data."""
         user = await UserDB.get_user_by_uuid(session, uuid)
         if user:
+            # Mark user as reset
             user.is_reset = True
             user.reset_at = datetime.datetime.utcnow()
+            
+            # Delete all diary entries for this user
+            delete_entries_query = delete(DiaryEntry).where(DiaryEntry.user_uuid == uuid)
+            await session.execute(delete_entries_query)
+            
+            # Delete all diary summaries for this user
+            delete_summaries_query = delete(DiaryEntrySummary).where(DiaryEntrySummary.user_uuid == uuid)
+            await session.execute(delete_summaries_query)
+            
+            # Delete all chat sessions and messages for this user
+            chat_sessions = await ChatDB.get_sessions_by_user(session, uuid)
+            for chat_session in chat_sessions:
+                await ChatDB.delete_session(session, chat_session.session_uuid)
+            
+            # Delete all contacts for this user
+            delete_contacts_query = delete(Contact).where(Contact.user_uuid == uuid)
+            await session.execute(delete_contacts_query)
+            
+            # Commit all changes
             await session.commit()
+            
+            logger.info(f"User {uuid} has been reset and all associated data deleted")
         return user
     
     @staticmethod

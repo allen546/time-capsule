@@ -196,15 +196,21 @@ const UserSession = {
         localStorage.removeItem('userUUID');
         
         // Try to notify the server about the reset
+        let serverMessage = '设备已重置';
         if (oldUUID) {
             try {
-                await fetch('/api/users/reset', {
+                const response = await fetch('/api/users/reset', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ old_uuid: oldUUID })
                 });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    serverMessage = data.message || serverMessage;
+                }
             } catch (err) {
                 console.warn('Could not notify server about device reset:', err);
             }
@@ -215,7 +221,7 @@ const UserSession = {
         localStorage.setItem('userUUID', newUUID);
         
         console.log('Device reset completed, new UUID:', newUUID);
-        return true;
+        return { success: true, message: serverMessage, newUUID };
     },
     
     /**

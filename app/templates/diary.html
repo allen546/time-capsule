@@ -6,20 +6,23 @@
     <title>时间胶囊 - 每日心情</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        /* Root variables for theme */
         :root {
-            --primary-color: #FF7043;
-            --secondary-color: #FFA726;
-            --background-color: #FFF8E1;
-            --card-color: #FFFFFF;
-            --text-color: #3E2723;
-            --text-secondary: #8D6E63;
-            --border-radius: 18px;
-            --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-            --font-size-base: 16px;
-            --font-size-large: 18px;
-            --font-size-xlarge: 20px;
-            --font-size-xxlarge: 24px;
-            --font-size-xxxlarge: 28px;
+            --primary-color: #FFA726;
+            --primary-rgb: 255, 167, 38; /* RGB value of primary color for opacity */
+            --secondary-color: #FB8C00;
+            --text-primary: #333;
+            --text-secondary: #666;
+            --card-color: #fff;
+            --background-color: #FFF8E1; /* Restored to light yellow */
+            --border-radius: 12px;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+            --font-family: 'Noto Sans SC', sans-serif;
+            --font-size-base: 18px;
+            --font-size-large: 20px;
+            --font-size-xlarge: 22px;
+            --font-size-xxlarge: 28px;
+            --font-size-xxxlarge: 32px;
         }
         
         /* 高对比度模式 */
@@ -438,15 +441,16 @@
         }
         textarea {
             width: 100%;
-            height: 200px;
+            height: 300px;
             border-radius: var(--border-radius);
             border: 1px solid var(--text-secondary);
-            padding: 12px;
+            padding: 16px;
             font-size: var(--font-size-base);
             margin-bottom: 20px;
             background-color: var(--card-color);
             color: var(--text-color);
             transition: border-color 0.2s ease;
+            line-height: 1.6;
         }
         
         textarea:focus {
@@ -455,22 +459,508 @@
         }
 
         .capsules-container {
-            position: relative;
-            width: 100vw; /* 设置为视口宽度 */
-            height: 100vh; /* 设置为视口高度 */
-            overflow: hidden; /* 隐藏超出容器的部分 */
+            display: none;
         }
 
         .capsule {
-            position: absolute;
-            width: 80px; /* 增加胶囊的宽度 */
-            height: 100px; /* 增加胶囊的高度 */
-            background: linear-gradient(135deg, #FF7043, #FFA726);
-            border-radius: 40px; /* 增加圆角 */
-            box-shadow: 0 4px 15px rgba(255, 112, 67, 0.3);
+            display: none;
+        }
+        
+        @keyframes floatCapsule {
+            0% { opacity: 0; }
+            100% { opacity: 0; }
+        }
+        
+        /* Sidebar styles */
+        .sidebar {
+            width: 460px;
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            overflow-y: auto;
+            max-height: calc(100vh - 100px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 80px;
+            align-self: flex-start;
+        }
+        
+        .sidebar-header {
+            padding: 18px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        
+        .sidebar-title {
+            font-size: var(--font-size-xlarge);
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        
+        .sidebar-action {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .sidebar-action:hover {
+            background-color: #E65100;
+        }
+        
+        .date-group {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        
+        .date-header {
+            padding: 14px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+        
+        .date-header:hover {
+            background-color: rgba(0, 0, 0, 0.03);
+        }
+        
+        .date-header.active {
+            background-color: rgba(255, 112, 67, 0.1);
+        }
+        
+        .date-label {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .date-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .date-summarize {
+            background-color: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 2px 4px;
+            margin-right: 6px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .date-summarize:hover {
+            color: var(--primary-color);
+            background-color: rgba(var(--primary-rgb), 0.1);
+        }
+        
+        .date-summarize i {
+            font-size: 12px;
+        }
+        
+        .date-count {
+            background-color: rgba(0, 0, 0, 0.05);
+            color: var(--text-secondary);
+            border-radius: 12px;
+            padding: 3px 10px;
+            font-size: 14px;
+            font-weight: 400;
+        }
+        
+        .date-toggle {
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .date-header.active .date-toggle {
+            transform: rotate(180deg);
+        }
+        
+        .entry-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .date-header.active + .entry-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .entry-item {
+            padding: 14px 20px 14px 40px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+            transition: background-color 0.2s ease;
+        }
+        
+        .entry-item:last-child {
+            border-bottom: none;
+        }
+        
+        .entry-item:hover {
+            padding-left: 46px;
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+        
+        .entry-item.active {
+            background-color: rgba(255, 112, 67, 0.05);
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .entry-title {
+            font-size: 16px;
+            margin-bottom: 4px;
+            color: var(--text-color);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .entry-preview {
+            font-size: 14px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .entry-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        .empty-sidebar {
+            padding: 50px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+        
+        .empty-sidebar-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        /* Main content styles */
+        .content {
+            flex: 1;
+            padding-left: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .content h2 {
+            margin-bottom: 16px;
+            font-size: var(--font-size-xxlarge);
+            color: var(--text-color);
+        }
+        
+        .diary-container {
+            display: flex;
+            gap: 30px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        @media (max-width: 768px) {
+            .diary-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: 300px;
+                margin-bottom: 20px;
+            }
+            
+            .content {
+                padding-left: 0;
+            }
+        }
+        
+        /* High contrast mode adjustments */
+        :root[data-theme="high-contrast"] .sidebar {
+            border: 2px solid var(--secondary-color);
+        }
+        
+        :root[data-theme="high-contrast"] .date-header:hover,
+        :root[data-theme="high-contrast"] .date-header.active {
+            background-color: #333;
+        }
+        
+        :root[data-theme="high-contrast"] .entry-item:hover,
+        :root[data-theme="high-contrast"] .entry-item.active {
+            background-color: #333;
+        }
+        
+        :root[data-theme="high-contrast"] .entry-item.active {
+            border-left: 3px solid var(--secondary-color);
+        }
+        
+        :root[data-theme="high-contrast"] .date-count {
+            background-color: #333;
+            color: var(--secondary-color);
+        }
+
+        @keyframes floatCapsule {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 0;
+            }
+            20% {
+                opacity: 0.8;
+            }
+            80% {
+                opacity: 0.8;
+            }
+            100% {
+                transform: translateY(-90vh) scale(0.6);
+                opacity: 0;
+            }
+        }
+        
+        /* Additional animation for sidebar interactions */
+        .date-header .date-toggle {
+            transition: transform 0.3s ease;
+        }
+        
+        .date-header.active .date-toggle {
+            transform: rotate(180deg);
+        }
+        
+        .entry-item {
+            transition: all 0.2s ease;
+        }
+        
+        .entry-item:hover {
+            padding-left: 40px;
+        }
+        
+        /* Added button group styles - adjust for multiple buttons */
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+            align-items: center;
+        }
+        
+        /* Delete button styles */
+        .delete-button {
+            background-color: transparent;
+            color: var(--text-secondary);
+            border: none;
+            border-radius: var(--border-radius);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.2s ease;
+        }
+        
+        .delete-button:hover {
+            color: #f44336;
+            transform: scale(1.1);
+        }
+        
+        .delete-button:active {
+            transform: scale(0.95);
+        }
+        
+        .delete-button i {
+            transition: all 0.2s ease;
+        }
+        
+        .delete-button:hover i {
+            transform: rotate(15deg);
+        }
+        
+        /* Hide delete button when no entry is selected */
+        .delete-button.hidden {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        /* Style scrollbar for better appearance */
+        .entry-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .entry-list::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.05);
+            border-radius: 3px;
+        }
+        
+        .entry-list::-webkit-scrollbar-thumb {
+            background: var(--text-secondary);
+            border-radius: 3px;
+        }
+        
+        .entry-list::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
+        }
+        
+        /* Remove the generate-summary-button styles */
+        .generate-summary-button {
+            display: none;
+        }
+        
+        /* Fix for mobile responsiveness */
+        @media (max-width: 768px) {
+            .sidebar {
+                max-height: 300px;
+            }
+            
+            .entry-item:hover {
+                padding-left: 36px; /* Don't expand on mobile */
+            }
+        }
+
+        /* Custom Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
             opacity: 0;
-            bottom: -50px; /* 确保胶囊从底部开始 */
-            animation: floatCapsule 6s ease-out forwards;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal-container {
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            width: 90%;
+            max-width: 400px;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+        
+        .modal-overlay.active .modal-container {
+            transform: translateY(0);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .modal-title {
+            font-size: var(--font-size-large);
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+        
+        .modal-content {
+            margin-bottom: 20px;
+            color: var(--text-color);
+            line-height: 1.5;
+        }
+        
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .modal-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: var(--font-size-base);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .modal-btn:hover {
+            transform: scale(1.05);
+            background-color: #E65100;
+        }
+        
+        .modal-btn.secondary {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            border: 1px solid var(--text-secondary);
+        }
+        
+        .modal-btn.secondary:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        
+        /* High contrast adjustments */
+        :root[data-theme="high-contrast"] .modal-container {
+            background-color: #000;
+            border: 2px solid var(--secondary-color);
+        }
+        
+        :root[data-theme="high-contrast"] .modal-btn.secondary {
+            background-color: #333;
+            color: white;
+            border: 1px solid var(--secondary-color);
+        }
+        
+        /* View summary button - has a different style to indicate it's a different action */
+        .date-view-summary {
+            background-color: rgba(var(--primary-rgb), 0.1);
+            border: none;
+            color: var(--primary-color);
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 2px 4px;
+            margin-right: 6px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .date-view-summary:hover {
+            background-color: rgba(var(--primary-rgb), 0.2);
         }
     </style>
 </head>
@@ -479,18 +969,44 @@
         <button class="back-button" id="back-button">
             <span class="back-icon">←</span>返回
         </button>
-        <div class="header-title">每日心情</div>
+        <div class="header-title">我的日记</div>
     </div>
     
-    <div class="container diary-container">
-        <div class="time-list">
-            <h2>时间列表</h2>
-            <ul id="timeEntries">
-                <!-- 动态生成的时间条目 -->
-            </ul>
+    <!-- Custom Modal -->
+    <div class="modal-overlay" id="customModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">提示</div>
+                <button class="modal-close" id="modalClose">×</button>
+            </div>
+            <div class="modal-content" id="modalContent"></div>
+            <div class="modal-actions">
+                <button class="modal-btn" id="modalPrimary">确定</button>
+                <button class="modal-btn secondary" id="modalSecondary" style="display: none;">取消</button>
+            </div>
         </div>
-        <div class="event-editor">
-            <h2>事件编辑区</h2>
+            </div>
+            
+    <div class="container diary-container">
+        <div class="sidebar" id="diary-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">日记列表</div>
+                <button class="sidebar-action" id="new-entry-btn">
+                    <i class="fas fa-plus"></i>新建
+            </button>
+            </div>
+            <div id="entries-container">
+                <!-- Date groups will be generated here -->
+                <div class="empty-sidebar" id="empty-sidebar">
+                    <div class="empty-sidebar-icon">📝</div>
+                    <div>暂无日记</div>
+                    <div>点击"新建"创建你的第一篇日记</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <h2>日记编辑区</h2>
             <div id="today-date" style="font-size: var(--font-size-large); margin-bottom: 10px;"></div>
             <textarea id="diaryEntry" placeholder="写下你的日记..."></textarea>
             <div class="mood-selector">
@@ -500,8 +1016,12 @@
                 <button class="mood-button" data-mood="excited" title="兴奋">😄</button>
                 <button class="mood-button" data-mood="angry" title="生气">😠</button>
             </div>
-            <button id="saveButton" class="save-button">保存日记</button>
-            <button id="generateSummaryButton" class="generate-summary-button">生成总结</button>
+            <div class="button-group">
+                <button id="saveButton" class="save-button">保存日记</button>
+                <button id="deleteButton" class="delete-button hidden" title="删除日记">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
         </div>
     </div>
     
@@ -522,10 +1042,6 @@
                 <button class="contrast-toggle" id="contrast-toggle">开启</button>
             </div>
         </div>
-    </div>
-    
-    <div class="capsules-container">
-        <!-- 胶囊将被动态生成到这里 -->
     </div>
     
     <script>
@@ -599,47 +1115,66 @@
         // 保存按钮
         document.getElementById('saveButton').addEventListener('click', async function() {
             if (!selectedMood) {
-                alert('请选择一个心情');
+                showModal('提示', '请选择一个心情');
                 return;
             }
             
             const content = document.getElementById('diaryEntry').value.trim();
             if (!content) {
-                alert('请记录一下今天发生的事情');
+                showModal('提示', '请记录一下今天发生的事情');
                 return;
             }
             
+            const entryId = document.getElementById('diaryEntry').dataset.entryId;
+            
             try {
-                const response = await fetch('/api/diary/entries', {
+                // Format today's date
+                const today = new Date();
+                const dateString = today.toISOString().split('T')[0];
+                
+                const entryData = {
+                    title: `${today.toLocaleDateString('zh-CN')}的心情`,
+                    content: content,
+                    date: dateString,
+                    mood: selectedMood
+                };
+                
+                let response;
+                
+                if (entryId) {
+                    // Update existing entry
+                    entryData.id = entryId;
+                    response = await fetch(`/api/diary/entries/${entryId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-User-UUID': localStorage.getItem('userUUID')
+                        },
+                        body: JSON.stringify(entryData)
+                    });
+                } else {
+                    // Create new entry
+                    response = await fetch('/api/diary/entries', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-User-UUID': localStorage.getItem('user_uuid') || 'test-user'
+                        'X-User-UUID': localStorage.getItem('userUUID')
                     },
-                    body: JSON.stringify({
-                        title: `${formattedDate}的心情`,
-                        content: content,
-                        date: today.toISOString().split('T')[0],
-                        mood: selectedMood
-                    })
-                });
+                        body: JSON.stringify(entryData)
+                    });
+                }
                 
                 if (!response.ok) {
                     throw new Error('Failed to save diary entry');
                 }
                 
-                // 清空输入
-                document.getElementById('diaryEntry').value = '';
-                moodButtons.forEach(btn => btn.classList.remove('selected'));
-                selectedMood = null;
+                // Reload diary entries to update the sidebar
+                await loadDiaryEntries();
                 
-                // 重新加载日记列表
-                loadDiaryEntries();
-                
-                alert('保存成功！');
+                showModal('成功', '保存成功！');
             } catch (error) {
                 console.error('Error saving diary entry:', error);
-                alert('保存失败，请稍后再试');
+                showModal('错误', '保存失败，请稍后再试');
             }
         });
         
@@ -670,11 +1205,11 @@
         });
         
         function updateFontSize() {
-            root.style.setProperty('--font-size-base', `${16 * currentFontSize}px`);
-            root.style.setProperty('--font-size-large', `${18 * currentFontSize}px`);
-            root.style.setProperty('--font-size-xlarge', `${20 * currentFontSize}px`);
-            root.style.setProperty('--font-size-xxlarge', `${24 * currentFontSize}px`);
-            root.style.setProperty('--font-size-xxxlarge', `${28 * currentFontSize}px`);
+            root.style.setProperty('--font-size-base', `${18 * currentFontSize}px`);
+            root.style.setProperty('--font-size-large', `${20 * currentFontSize}px`);
+            root.style.setProperty('--font-size-xlarge', `${22 * currentFontSize}px`);
+            root.style.setProperty('--font-size-xxlarge', `${28 * currentFontSize}px`);
+            root.style.setProperty('--font-size-xxxlarge', `${32 * currentFontSize}px`);
         }
         
         // 高对比度模式
@@ -697,6 +1232,45 @@
             saveSettings();
         });
         
+        // Debug helper function
+        function debugInfo() {
+            console.group('Diary Page Debug Info');
+            
+            // Log DOM elements
+            console.log('entries-container exists:', !!document.getElementById('entries-container'));
+            console.log('empty-sidebar exists:', !!document.getElementById('empty-sidebar'));
+            console.log('diary-sidebar exists:', !!document.getElementById('diary-sidebar'));
+            console.log('diaryEntry exists:', !!document.getElementById('diaryEntry'));
+            console.log('saveButton exists:', !!document.getElementById('saveButton'));
+            
+            // Log localStorage
+            console.log('localStorage userUUID:', localStorage.getItem('userUUID'));
+            console.log('localStorage fontSetting:', localStorage.getItem('timeCapsuleFontSize'));
+            console.log('localStorage contrastSetting:', localStorage.getItem('timeCapsuleHighContrast'));
+            
+            console.groupEnd();
+            
+            // Add visual feedback
+            const debugDiv = document.createElement('div');
+            debugDiv.style.position = 'fixed';
+            debugDiv.style.bottom = '10px';
+            debugDiv.style.left = '10px';
+            debugDiv.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            debugDiv.style.color = '#fff';
+            debugDiv.style.padding = '10px';
+            debugDiv.style.borderRadius = '5px';
+            debugDiv.style.zIndex = '9999';
+            debugDiv.textContent = 'Debug info logged to console';
+            
+            document.body.appendChild(debugDiv);
+            
+            setTimeout(() => {
+                debugDiv.style.opacity = '0';
+                debugDiv.style.transition = 'opacity 0.5s ease';
+                setTimeout(() => debugDiv.remove(), 500);
+            }, 3000);
+        }
+        
         // 保存设置到本地存储
         function saveSettings() {
             localStorage.setItem('timeCapsuleFontSize', currentFontSize);
@@ -711,6 +1285,11 @@
             if (savedFontSize) {
                 currentFontSize = parseFloat(savedFontSize);
                 updateFontSize();
+            } else {
+                // Set default font size to 1.15 (115%) if no saved preference
+                currentFontSize = 1.15;
+                updateFontSize();
+                saveSettings();
             }
             
             if (savedHighContrast === 'true') {
@@ -725,12 +1304,24 @@
         // 页面加载时应用保存的设置
         window.addEventListener('load', loadSettings);
         
-        // 加载日记列表
+        // Load diary entries on page load
+        window.addEventListener('load', loadDiaryEntries);
+        
+        // Group entries by date and populate sidebar
         async function loadDiaryEntries() {
             try {
+                const userUUID = localStorage.getItem('userUUID');
+                if (!userUUID) {
+                    console.error('No user UUID found in localStorage');
+                    // Initialize UserSession if needed
+                    if (window.UserSession) {
+                        await window.UserSession.ensureInitialized();
+                    }
+                }
+                
                 const response = await fetch('/api/diary/entries', {
                     headers: {
-                        'X-User-UUID': localStorage.getItem('user_uuid') || 'test-user'
+                        'X-User-UUID': localStorage.getItem('userUUID')
                     }
                 });
                 
@@ -739,155 +1330,609 @@
                 }
                 
                 const data = await response.json();
-                const diaryList = document.getElementById('diary-list');
+                const entriesContainer = document.getElementById('entries-container');
+                const emptySidebar = document.getElementById('empty-sidebar');
                 
-                if (!data.data || data.data.length === 0) {
-                    // 如果没有日记，显示空状态
+                // Add null check for emptySidebar
+                if (!entriesContainer) {
+                    console.error('Entries container element not found');
                     return;
                 }
                 
-                // 清空空状态
-                diaryList.innerHTML = '';
+                if (!data.data || data.data.length === 0) {
+                    // Show empty state if no entries
+                    if (emptySidebar) {
+                        emptySidebar.style.display = 'block';
+                    }
+                    return;
+                }
                 
-                // 添加日记项
+                // Hide empty state
+                if (emptySidebar) {
+                    emptySidebar.style.display = 'none';
+                }
+                
+                // Group entries by date
+                const entriesByDate = {};
                 data.data.forEach(entry => {
-                    const diaryItem = document.createElement('div');
-                    diaryItem.className = 'diary-item';
+                    const date = entry.date.split('T')[0]; // Handle ISO dates
+                    if (!entriesByDate[date]) {
+                        entriesByDate[date] = [];
+                    }
+                    entriesByDate[date].push(entry);
+                });
+                
+                // Clear existing entries
+                entriesContainer.innerHTML = '';
+                
+                // Sort dates in descending order (newest first)
+                const sortedDates = Object.keys(entriesByDate).sort((a, b) => new Date(b) - new Date(a));
+                
+                // Create date groups
+                sortedDates.forEach((date, index) => {
+                    const entries = entriesByDate[date];
                     
-                    // 格式化日期
-                    const date = new Date(entry.date);
-                    const formattedDate = date.toLocaleDateString('zh-CN', {
+                    // Format the date for display
+                    const displayDate = new Date(date).toLocaleDateString('zh-CN', {
                         year: 'numeric',
                         month: '2-digit',
-                        day: '2-digit'
+                        day: '2-digit',
+                        weekday: 'short'
                     });
                     
-                    // 获取心情图标
-                    const moodIcons = {
-                        'happy': '😊',
-                        'sad': '😢',
-                        'angry': '😠',
-                        'calm': '😌',
-                        'excited': '🤗',
-                        // 支持中文心情参数
-                        '喜': '😄',
-                        '怒': '😠',
-                        '哀': '😢',
-                        '思': '🤔',
-                        '乐': '😊'
-                    };
+                    // Create date group
+                    const dateGroup = document.createElement('div');
+                    dateGroup.className = 'date-group';
+                    dateGroup.dataset.date = date;
                     
-                    // 心情英文转中文
-                    const moodTranslations = {
-                        'happy': '开心',
-                        'sad': '悲伤',
-                        'angry': '生气',
-                        'calm': '平静',
-                        'excited': '兴奋',
-                        // 保持中文心情参数不变
-                        '喜': '喜',
-                        '怒': '怒',
-                        '哀': '哀',
-                        '思': '思',
-                        '乐': '乐'
-                    };
+                    // Create date header
+                    const dateHeader = document.createElement('div');
+                    dateHeader.className = index === 0 ? 'date-header active' : 'date-header';
                     
-                    const moodIcon = moodIcons[entry.mood] || moodIcons.calm;
-                    const moodText = moodTranslations[entry.mood] || '平静';
-                    
-                    diaryItem.innerHTML = `
-                        <div class="diary-date">
-                            <span class="date-icon">📅</span>${formattedDate}
+                    // First create with placeholder for the summary button
+                    dateHeader.innerHTML = `
+                        <div class="date-label">
+                            <i class="fas fa-calendar-day"></i>
+                            ${displayDate}
+                            <span class="date-count">${entries.length}</span>
                         </div>
-                        <div class="diary-content">${entry.content}</div>
-                        <div class="diary-meta">
-                            <div class="diary-mood">
-                                <span class="mood-icon">${moodIcon}</span>${moodText}
-                            </div>
+                        <div class="date-actions">
+                            <button class="date-summarize-placeholder" data-date="${date}">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </button>
+                            <i class="fas fa-chevron-down date-toggle"></i>
                         </div>
                     `;
                     
-                    diaryList.appendChild(diaryItem);
+                    // Create entry list container
+                    const entryList = document.createElement('div');
+                    entryList.className = 'entry-list';
+                    
+                    // Check if a summary exists for this date
+                    checkForExistingSummary(date, dateHeader, entries, data.data);
+                    
+                    // Add entries to the list
+                    entries.forEach(entry => {
+                        const entryItem = document.createElement('div');
+                        entryItem.className = 'entry-item';
+                        entryItem.dataset.entryId = entry.id;
+                        
+                        // Get appropriate emoji for mood
+                        const moodEmojis = {
+                        'happy': '😊',
+                        'sad': '😢',
+                        'angry': '😠',
+                            'neutral': '😐',
+                            'excited': '😄'
+                        };
+                        const moodEmoji = moodEmojis[entry.mood] || '📝';
+                        
+                        // Format time
+                        const entryTime = entry.created_at ? 
+                            new Date(entry.created_at).toLocaleTimeString('zh-CN', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }) : '';
+                        
+                        // Generate preview from content (max 30 chars)
+                        const preview = entry.content.length > 30 
+                            ? entry.content.substring(0, 30) + '...' 
+                            : entry.content;
+                        
+                        entryItem.innerHTML = `
+                            <div class="entry-title">${moodEmoji} ${entry.title || '无标题日记'}</div>
+                            <div class="entry-preview">${preview}</div>
+                            <div class="entry-time">${entryTime}</div>
+                        `;
+                        
+                        // Event listener to load entry content
+                        entryItem.addEventListener('click', () => {
+                            displayEntryContent(entry);
+                            
+                            // Mark this entry as active
+                            document.querySelectorAll('.entry-item').forEach(item => {
+                                item.classList.remove('active');
+                            });
+                            entryItem.classList.add('active');
+                        });
+                        
+                        entryList.appendChild(entryItem);
+                    });
+                    
+                    // Add toggle functionality to date header
+                    dateHeader.addEventListener('click', (e) => {
+                        // Don't toggle if clicking the summarize button
+                        if (e.target.closest('.date-summarize')) {
+                            return;
+                        }
+                        dateHeader.classList.toggle('active');
+                    });
+                    
+                    // Append elements to the date group
+                    dateGroup.appendChild(dateHeader);
+                    dateGroup.appendChild(entryList);
+                    entriesContainer.appendChild(dateGroup);
                 });
+                
+                // Select first entry by default
+                if (sortedDates.length > 0 && entriesByDate[sortedDates[0]].length > 0) {
+                    const firstEntry = entriesByDate[sortedDates[0]][0];
+                    displayEntryContent(firstEntry);
+                    
+                    // Mark first entry as active
+                    const firstEntryItem = document.querySelector('.entry-item');
+                    if (firstEntryItem) {
+                        firstEntryItem.classList.add('active');
+                    }
+                }
+                
             } catch (error) {
                 console.error('Error loading diary entries:', error);
-                const diaryList = document.getElementById('diary-list');
-                diaryList.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">⚠️</div>
-                        <div class="empty-title">加载失败</div>
-                        <div class="empty-description">无法加载日记列表，请稍后再试。</div>
+                if (entriesContainer) {
+                    entriesContainer.innerHTML = `
+                        <div class="empty-sidebar">
+                            <div class="empty-sidebar-icon">⚠️</div>
+                            <div>加载失败</div>
+                            <div>无法加载日记列表，请稍后再试</div>
                     </div>
                 `;
+                }
             }
         }
         
-        // 页面加载时加载日记列表
-        window.addEventListener('load', loadDiaryEntries);
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const diaryEntry = document.getElementById('diaryEntry');
-            const timeEntries = document.getElementById('timeEntries');
-            const saveButton = document.getElementById('saveButton');
-            const generateSummaryButton = document.getElementById('generateSummaryButton');
-            let selectedMood = null;
-
-            // 自动新建日记
-            function createNewDiaryEntry() {
-                const today = new Date().toISOString().split('T')[0]; // 获取今天的日期
-                diaryEntry.value = ''; // 清空编辑区
-
-                // 在时间列表中添加今天的条目
-                const listItem = document.createElement('li');
-                listItem.textContent = today;
-                timeEntries.appendChild(listItem);
-            }
-
-            // 生成总结
-            async function generateSummary() {
-                const entryText = diaryEntry.value.trim();
-                if (entryText === '') {
-                    alert('请先写下日记内容！');
-                    return;
-                }
-
-                try {
-                    // 调用后端 API 进行分析
-                    const response = await fetch('/api/analyze', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ text: entryText })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error('分析请求失败');
-                    }
-
-                    const analysisResult = await response.json();
-                    const summary = `今天的日记内容: ${entryText}，分析结果: ${analysisResult.summary}`;
-                    alert('总结已生成！\n' + summary);
-                } catch (error) {
-                    console.error('Error during analysis:', error);
-                    alert('分析失败，请稍后再试');
-                }
-            }
-
-            // 事件监听
-            saveButton.addEventListener('click', () => {
-                const entryText = diaryEntry.value.trim();
-                if (entryText === '') {
-                    alert('请先写下日记内容！');
-                    return;
-                }
-                alert('日记已保存！');
-                // 这里可以将日记内容保存到服务器
+        // Display entry content in the editor
+        function displayEntryContent(entry) {
+            document.getElementById('diaryEntry').value = entry.content || '';
+            
+            // Update date display
+            const entryDate = new Date(entry.date);
+            document.getElementById('today-date').textContent = entryDate.toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                weekday: 'long'
             });
+            
+            // Select the mood button if applicable
+            const moodButtons = document.querySelectorAll('.mood-button');
+            moodButtons.forEach(btn => {
+                btn.classList.remove('selected');
+                if (btn.dataset.mood === entry.mood) {
+                    btn.classList.add('selected');
+                    selectedMood = entry.mood;
+                }
+            });
+            
+            // Store the current entry ID
+            document.getElementById('diaryEntry').dataset.entryId = entry.id;
+            
+            // Show delete button when an entry is loaded
+            document.getElementById('deleteButton').classList.remove('hidden');
+        }
+        
+        // New entry button functionality
+        document.getElementById('new-entry-btn').addEventListener('click', () => {
+            // Clear the editor
+            document.getElementById('diaryEntry').value = '';
+            document.getElementById('diaryEntry').dataset.entryId = '';
+            
+            // Reset mood selection
+            document.querySelectorAll('.mood-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            selectedMood = null;
+            
+            // Set today's date
+            const today = new Date();
+            document.getElementById('today-date').textContent = today.toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                weekday: 'long'
+            });
+            
+            // Remove active class from all entries
+            document.querySelectorAll('.entry-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Hide delete button for new entries
+            document.getElementById('deleteButton').classList.add('hidden');
+        });
+        
+        // Delete button functionality
+        document.getElementById('deleteButton').addEventListener('click', async function() {
+            const entryId = document.getElementById('diaryEntry').dataset.entryId;
+            
+            if (!entryId) {
+                return; // No entry selected
+            }
+            
+            // Confirm deletion
+            showConfirmModal('确认', '确定要删除这篇日记吗？此操作不可撤销。', async () => {
+                try {
+                    const response = await fetch(`/api/diary/entries/${entryId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-User-UUID': localStorage.getItem('userUUID')
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to delete diary entry');
+                    }
+                    
+                    // Reload entries
+                    await loadDiaryEntries();
+                    
+                    // Clear the editor
+                    document.getElementById('diaryEntry').value = '';
+                    document.getElementById('diaryEntry').dataset.entryId = '';
+                    
+                    // Reset mood selection
+                    document.querySelectorAll('.mood-button').forEach(btn => {
+                        btn.classList.remove('selected');
+                    });
+                    selectedMood = null;
+                    
+                    // Hide delete button
+                    document.getElementById('deleteButton').classList.add('hidden');
+                    
+                    showModal('成功', '日记已删除');
+                } catch (error) {
+                    console.error('Error deleting entry:', error);
+                    showModal('错误', '删除失败，请稍后再试');
+                }
+            });
+        });
+        
+        // Disable the createCapsules function 
+        function createCapsules() {
+            // Function disabled
+        }
 
-            generateSummaryButton.addEventListener('click', generateSummary);
+        // 调用创建胶囊的函数 (disabled)
+        // createCapsules();
 
-            // 心情选择
+        // Function to check if a summary exists and update the button accordingly
+        async function checkForExistingSummary(date, dateHeader, entries, allEntries) {
+            try {
+                const response = await fetch(`/api/diary/summary/${date}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-UUID': localStorage.getItem('userUUID')
+                    }
+                });
+                
+                const placeholder = dateHeader.querySelector('.date-summarize-placeholder');
+                if (!placeholder) return;
+                
+                const dateActions = placeholder.parentElement;
+                
+                // Create the new button based on whether a summary exists
+                const newButton = document.createElement('button');
+                newButton.dataset.date = date;
+                
+                if (response.ok) {
+                    // Summary exists - show "View Summary" button
+                    newButton.className = 'date-view-summary';
+                    newButton.title = '查看这一天的日记总结';
+                    newButton.innerHTML = '查看总结';
+                    
+                    newButton.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        
+                        // Get the date and entries from the parent elements
+                        const date = newButton.dataset.date;
+                        showExistingSummary(date);
+                    });
+                } else {
+                    // No summary exists - show "Summarize" button
+                    newButton.className = 'date-summarize';
+                    newButton.title = '生成这一天的日记总结';
+                    newButton.innerHTML = '<i class="fas fa-magic"></i>总结';
+                    
+                    newButton.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        summarizeDate(date, entries);
+                    });
+                }
+                
+                // Replace the placeholder with the new button
+                dateActions.replaceChild(newButton, placeholder);
+                
+            } catch (error) {
+                console.error('Error checking for existing summary:', error);
+                
+                // If there's an error, default to the summarize button
+                const placeholder = dateHeader.querySelector('.date-summarize-placeholder');
+                if (!placeholder) return;
+                
+                const newButton = document.createElement('button');
+                newButton.className = 'date-summarize';
+                newButton.dataset.date = date;
+                newButton.title = '生成这一天的日记总结';
+                newButton.innerHTML = '<i class="fas fa-magic"></i>总结';
+                
+                // Add the summarize functionality
+                newButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    summarizeDate(date, entries);
+                });
+                
+                placeholder.parentElement.replaceChild(newButton, placeholder);
+            }
+        }
+
+        // Function to show an existing summary
+        async function showExistingSummary(date) {
+            try {
+                // Show loading state
+                const loadingDiv = document.createElement('div');
+                loadingDiv.style.position = 'fixed';
+                loadingDiv.style.top = '50%';
+                loadingDiv.style.left = '50%';
+                loadingDiv.style.transform = 'translate(-50%, -50%)';
+                loadingDiv.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                loadingDiv.style.color = '#fff';
+                loadingDiv.style.padding = '20px 30px';
+                loadingDiv.style.borderRadius = '10px';
+                loadingDiv.style.zIndex = '9999';
+                loadingDiv.style.display = 'flex';
+                loadingDiv.style.flexDirection = 'column';
+                loadingDiv.style.alignItems = 'center';
+                loadingDiv.style.gap = '10px';
+                
+                // Format date for display
+                const displayDate = new Date(date).toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    weekday: 'long'
+                });
+                
+                loadingDiv.innerHTML = `
+                    <div style="font-size: 24px;"><i class="fas fa-spinner fa-spin"></i></div>
+                    <div>正在获取 ${displayDate} 的日记总结...</div>
+                `;
+                document.body.appendChild(loadingDiv);
+                
+                // Get the summary
+                const response = await fetch(`/api/diary/summary/${date}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-UUID': localStorage.getItem('userUUID')
+                    }
+                });
+                
+                // Remove loading indicator
+                document.body.removeChild(loadingDiv);
+                
+                if (!response.ok) {
+                    throw new Error(`获取总结失败: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Create a modal to display the summary
+                const modalOverlay = document.createElement('div');
+                modalOverlay.style.position = 'fixed';
+                modalOverlay.style.top = '0';
+                modalOverlay.style.left = '0';
+                modalOverlay.style.width = '100%';
+                modalOverlay.style.height = '100%';
+                modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                modalOverlay.style.display = 'flex';
+                modalOverlay.style.justifyContent = 'center';
+                modalOverlay.style.alignItems = 'center';
+                modalOverlay.style.zIndex = '1000';
+                
+                const modalContent = document.createElement('div');
+                modalContent.style.backgroundColor = 'var(--card-color)';
+                modalContent.style.borderRadius = 'var(--border-radius)';
+                modalContent.style.boxShadow = 'var(--shadow)';
+                modalContent.style.padding = '20px';
+                modalContent.style.maxWidth = '600px';
+                modalContent.style.width = '90%';
+                modalContent.style.maxHeight = '80vh';
+                modalContent.style.overflow = 'auto';
+                
+                modalContent.innerHTML = `
+                    <h2 style="margin-bottom: 15px; color: var(--primary-color);">${displayDate} 的日记总结</h2>
+                    <div style="line-height: 1.6; margin-bottom: 20px;">${data.data.summary}</div>
+                    <div style="text-align: right;">
+                        <button id="close-summary" style="background-color: var(--primary-color); color: white; border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer;">关闭</button>
+                    </div>
+                `;
+                
+                modalOverlay.appendChild(modalContent);
+                document.body.appendChild(modalOverlay);
+                
+                document.getElementById('close-summary').addEventListener('click', () => {
+                    document.body.removeChild(modalOverlay);
+                });
+                
+                // Also add a keyboard event listener to close with Escape key
+                const escHandler = (e) => {
+                    if (e.key === 'Escape') {
+                        document.body.removeChild(modalOverlay);
+                        document.removeEventListener('keydown', escHandler);
+                    }
+                };
+                document.addEventListener('keydown', escHandler);
+            } catch (error) {
+                console.error('Error showing summary:', error);
+                showModal('错误', `获取总结时发生错误: ${error.message}`);
+            }
+        }
+
+        // Function to summarize entries for a specific date - updated with Chinese prompts
+        async function summarizeDate(date, entries) {
+            // Format date for display
+            const displayDate = new Date(date).toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                weekday: 'long'
+            });
+            
+            // Check if there are entries to summarize
+            if (!entries || entries.length === 0) {
+                showModal('提示', `没有找到 ${displayDate} 的日记条目可以总结`);
+                return;
+            }
+            
+            // Confirm with user
+            showConfirmModal('确认', `要生成 ${displayDate} 的日记总结吗？AI将分析您这一天的所有日记内容，提炼关键点和情感，生成一份总结。`, async () => {
+                try {
+                    // Show loading state
+                    const loadingDiv = document.createElement('div');
+                    loadingDiv.style.position = 'fixed';
+                    loadingDiv.style.top = '50%';
+                    loadingDiv.style.left = '50%';
+                    loadingDiv.style.transform = 'translate(-50%, -50%)';
+                    loadingDiv.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                    loadingDiv.style.color = '#fff';
+                    loadingDiv.style.padding = '20px 30px';
+                    loadingDiv.style.borderRadius = '10px';
+                    loadingDiv.style.zIndex = '9999';
+                    loadingDiv.style.display = 'flex';
+                    loadingDiv.style.flexDirection = 'column';
+                    loadingDiv.style.alignItems = 'center';
+                    loadingDiv.style.gap = '10px';
+                    loadingDiv.innerHTML = `
+                        <div style="font-size: 24px;"><i class="fas fa-spinner fa-spin"></i></div>
+                        <div>正在生成 ${displayDate} 的日记总结...</div>
+                        <div style="font-size: 12px; margin-top: 5px;">这可能需要几秒钟时间</div>
+                    `;
+                    document.body.appendChild(loadingDiv);
+                    
+                    // Call the diary/summarize API endpoint
+                    const response = await fetch(`/api/diary/summarize/${date}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-User-UUID': localStorage.getItem('userUUID')
+                        }
+                    });
+                    
+                    // Remove loading indicator
+                    document.body.removeChild(loadingDiv);
+                    
+                    if (!response.ok) {
+                        throw new Error(`总结请求失败: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.data && data.data.summary) {
+                        // After successful summarization, update the button to "View Summary"
+                        const dateGroup = document.querySelector(`.date-group[data-date="${date}"]`);
+                        if (dateGroup) {
+                            const summarizeBtn = dateGroup.querySelector('.date-summarize');
+                            if (summarizeBtn) {
+                                const viewSummaryBtn = document.createElement('button');
+                                viewSummaryBtn.className = 'date-view-summary';
+                                viewSummaryBtn.dataset.date = date;
+                                viewSummaryBtn.title = '查看这一天的日记总结';
+                                viewSummaryBtn.innerHTML = '<i class="fas fa-book-open"></i>查看总结';
+                                viewSummaryBtn.innerHTML = '查看总结';
+                                
+                                viewSummaryBtn.addEventListener('click', (e) => {
+                                    e.stopPropagation();
+                                    showExistingSummary(date);
+                                });
+                                
+                                summarizeBtn.parentElement.replaceChild(viewSummaryBtn, summarizeBtn);
+                            }
+                        }
+                        
+                        // Create a modal to display the summary
+                        const modalOverlay = document.createElement('div');
+                        modalOverlay.style.position = 'fixed';
+                        modalOverlay.style.top = '0';
+                        modalOverlay.style.left = '0';
+                        modalOverlay.style.width = '100%';
+                        modalOverlay.style.height = '100%';
+                        modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                        modalOverlay.style.display = 'flex';
+                        modalOverlay.style.justifyContent = 'center';
+                        modalOverlay.style.alignItems = 'center';
+                        modalOverlay.style.zIndex = '1000';
+                        
+                        const modalContent = document.createElement('div');
+                        modalContent.style.backgroundColor = 'var(--card-color)';
+                        modalContent.style.borderRadius = 'var(--border-radius)';
+                        modalContent.style.boxShadow = 'var(--shadow)';
+                        modalContent.style.padding = '20px';
+                        modalContent.style.maxWidth = '600px';
+                        modalContent.style.width = '90%';
+                        modalContent.style.maxHeight = '80vh';
+                        modalContent.style.overflow = 'auto';
+                        
+                        modalContent.innerHTML = `
+                            <h2 style="margin-bottom: 15px; color: var(--primary-color);">${displayDate} 的日记总结</h2>
+                            <div style="line-height: 1.6; margin-bottom: 20px;">${data.data.summary}</div>
+                            <div style="text-align: right;">
+                                <button id="close-summary" style="background-color: var(--primary-color); color: white; border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer;">关闭</button>
+                            </div>
+                        `;
+                        
+                        modalOverlay.appendChild(modalContent);
+                        document.body.appendChild(modalOverlay);
+                        
+                        document.getElementById('close-summary').addEventListener('click', () => {
+                            document.body.removeChild(modalOverlay);
+                        });
+                        
+                        // Also add a keyboard event listener to close with Escape key
+                        const escHandler = (e) => {
+                            if (e.key === 'Escape') {
+                                document.body.removeChild(modalOverlay);
+                                document.removeEventListener('keydown', escHandler);
+                            }
+                        };
+                        document.addEventListener('keydown', escHandler);
+                        
+                    } else {
+                        showModal('错误', '生成总结失败，请稍后再试');
+                    }
+                    
+                } catch (error) {
+                    console.error('Error generating summary:', error);
+                    showModal('错误', `生成总结时发生错误: ${error.message}`);
+                }
+            });
+        }
+
+        // Initialize diary page
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化
+            createNewDiaryEntry();
+            
+            // 心情选择重复绑定
             const moodButtons = document.querySelectorAll('.mood-button');
             moodButtons.forEach(button => {
                 button.addEventListener('click', function() {
@@ -896,37 +1941,100 @@
                     selectedMood = this.dataset.mood;
                 });
             });
-
-            // 初始化
-            createNewDiaryEntry();
+            
+            // Initialize custom modal functionality
+            initCustomModal();
         });
-
-        function createCapsules() {
-            const container = document.querySelector('.capsules-container');
-            const capsuleCount = 100; // 增加胶囊数量
-
-            for (let i = 0; i < capsuleCount; i++) {
-                const capsule = document.createElement('div');
-                capsule.className = 'capsule';
-
-                // 随机位置，确保胶囊在屏幕宽度内
-                const left = Math.random() * 90 + 5; // 5% 到 95% 的位置
-                capsule.style.left = `${left}%`;
-
-                // 随机大小
-                const size = Math.random() * 0.5 + 0.75; // 0.75 到 1.25
-                capsule.style.transform = `scale(${size})`;
-
-                // 随机延迟
-                const delay = Math.random() * 3; // 0 到 3 秒
-                capsule.style.animationDelay = `${delay}s`;
-
-                container.appendChild(capsule);
-            }
+        
+        // Custom Modal Functions
+        function initCustomModal() {
+            const modal = document.getElementById('customModal');
+            const modalClose = document.getElementById('modalClose');
+            const modalPrimary = document.getElementById('modalPrimary');
+            const modalSecondary = document.getElementById('modalSecondary');
+            
+            // Close modal when clicking the close button
+            modalClose.addEventListener('click', () => {
+                closeModal();
+            });
+            
+            // Close modal when clicking outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+            
+            // Close modal with Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.classList.contains('active')) {
+                    closeModal();
+                }
+            });
         }
-
-        // 调用创建胶囊的函数
-        createCapsules();
+        
+        // Show a basic modal
+        function showModal(title, message, callback) {
+            const modal = document.getElementById('customModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+            const modalPrimary = document.getElementById('modalPrimary');
+            const modalSecondary = document.getElementById('modalSecondary');
+            
+            // Set content
+            modalTitle.textContent = title;
+            modalContent.textContent = message;
+            
+            // Hide secondary button
+            modalSecondary.style.display = 'none';
+            
+            // Set primary button action
+            modalPrimary.textContent = '确定';
+            modalPrimary.onclick = () => {
+                closeModal();
+                if (callback) callback();
+            };
+            
+            // Show modal
+            modal.classList.add('active');
+        }
+        
+        // Show confirmation modal with Yes/No options
+        function showConfirmModal(title, message, onConfirm, onCancel) {
+            const modal = document.getElementById('customModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+            const modalPrimary = document.getElementById('modalPrimary');
+            const modalSecondary = document.getElementById('modalSecondary');
+            
+            // Set content
+            modalTitle.textContent = title;
+            modalContent.textContent = message;
+            
+            // Show and configure secondary button
+            modalSecondary.style.display = 'block';
+            modalSecondary.textContent = '取消';
+            modalSecondary.onclick = () => {
+                closeModal();
+                if (onCancel) onCancel();
+            };
+            
+            // Set primary button action
+            modalPrimary.textContent = '确定';
+            modalPrimary.onclick = () => {
+                closeModal();
+                if (onConfirm) onConfirm();
+            };
+            
+            // Show modal
+            modal.classList.add('active');
+        }
+        
+        // Close the modal
+        function closeModal() {
+            const modal = document.getElementById('customModal');
+            modal.classList.remove('active');
+        }
     </script>
 </body>
 </html> 

@@ -110,7 +110,7 @@ export TIME_CAPSULE_ENV=$ENV
 # Start the application with output logging
 if [[ "$ENV" == "prod" ]]; then
     echo "Starting in production mode with log to file"
-    cd app && python app.py --env $ENV --host $HOST --port $PORT $DEBUG 2>&1 | tee -a ../logs/timecapsule_$(date +%Y%m%d).log
+    cd app && python3 app.py --env $ENV --host $HOST --port $PORT $DEBUG 2>&1 | tee -a ../logs/timecapsule_$(date +%Y%m%d).log
 else
-    cd app && python app.py --env $ENV --host $HOST --port $PORT $DEBUG
+    cd app && python3 app.py --env $ENV --host $HOST --port $PORT $DEBUG
 fi 
