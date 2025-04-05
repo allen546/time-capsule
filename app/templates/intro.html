@@ -317,7 +317,7 @@
             box-shadow: 0 4px 15px rgba(255, 112, 67, 0.3);
             opacity: 0;
             bottom: -50px;
-            animation: finalCapsuleFloat 4s ease-out forwards;
+            animation: finalCapsuleFloat 3s ease-out forwards;
         }
 
         @keyframes finalCapsuleFloat {
@@ -325,11 +325,10 @@
                 opacity: 0;
                 transform: translateY(0) scale(1);
             }
-            15% {
+            20% {
                 opacity: 1;
-                transform: translateY(20vh) scale(1);
             }
-            85% {
+            80% {
                 opacity: 1;
                 transform: translateY(-100vh) scale(1);
             }
@@ -596,14 +595,14 @@
                 // 延迟后跳转到home页面
                 setTimeout(() => {
                     window.location.replace('/home');
-                }, 7000); // 延长到7秒，给胶囊更多时间上升
+                }, 5000); // 5秒后跳转到主页
             }, 500); // 等待第二幕完全淡出
         }
 
         // 创建最终的胶囊动画
         function createFinalCapsules() {
             const container = document.getElementById('finalCapsulesContainer');
-            const capsuleCount = 350; // 增加胶囊数量
+            const capsuleCount = 200;
             
             for (let i = 0; i < capsuleCount; i++) {
                 const capsule = document.createElement('div');
@@ -614,26 +613,11 @@
                 capsule.style.left = `${left}%`;
                 
                 // 随机大小
-                const size = Math.random() * 0.6 + 0.6; // 0.6 到 1.2
+                const size = Math.random() * 0.5 + 0.75;
                 capsule.style.transform = `scale(${size})`;
                 
-                // 随机颜色变化
-                if (Math.random() > 0.7) {
-                    // 30%几率使用不同的颜色渐变
-                    const hue1 = Math.floor(Math.random() * 40) + 10; // 10-50
-                    const hue2 = hue1 + Math.floor(Math.random() * 20) + 10; // hue1 + (10-30)
-                    capsule.style.background = `linear-gradient(135deg, hsl(${hue1}, 100%, 60%), hsl(${hue2}, 100%, 60%))`;
-                }
-                
-                // 随机形状变化
-                if (Math.random() > 0.8) {
-                    // 20%几率变为更圆的形状
-                    capsule.style.borderRadius = "40px";
-                    capsule.style.height = `${70 + Math.random() * 30}px`;
-                }
-                
                 // 随机延迟
-                const delay = Math.random() * 3;
+                const delay = Math.random() * 2;
                 capsule.style.animationDelay = `${delay}s`;
                 
                 container.appendChild(capsule);
