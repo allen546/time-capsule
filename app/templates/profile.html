@@ -425,13 +425,13 @@
                         this.disabled = true;
                         
                         // Reset device
-                        await window.UserSession.resetDevice();
+                        const result = await window.UserSession.resetDevice();
                         
                         // Hide modal
                         deleteConfirmModal.hide();
                         
-                        // Show success message
-                        alert('设备已重置。请刷新页面以重新开始。');
+                        // Show success message with details including the new UUID
+                        alert(`设备已重置成功！\n\n您的所有数据（包括日记、日记总结、聊天记录和联系人）已被清除。\n\n新设备ID: ${result.newUUID}\n\n请刷新页面以重新开始。`);
                         
                         // Reload page
                         window.location.reload();

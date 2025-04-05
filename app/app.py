@@ -106,7 +106,7 @@ def configure_logging():
     
     # Set up specific loggers for non-chat components
     diary_logger = logging.getLogger('diary')
-    diary_logger.setLevel(logging.WARNING)  # Only log warnings and errors
+    diary_logger.setLevel(logging.INFO)  # Changed from WARNING to INFO
     
     profile_logger = logging.getLogger('profile')
     profile_logger.setLevel(logging.WARNING)  # Only log warnings and errors
@@ -643,11 +643,14 @@ async def reset_device(request):
         # Log the reset event
         logger.info(f"Device reset request for UUID: {old_uuid}")
         
-        # Mark user as reset in database
+        # Mark user as reset in database and delete associated data
         async with request.ctx.session as session:
             await UserDB.reset_user(session, old_uuid)
         
-        return json_response({"status": "success", "message": "Device reset completed"})
+        return json_response({
+            "status": "success", 
+            "message": "设备已重置，所有日记、聊天记录和联系人数据已清除"
+        })
     except Exception as e:
         logger.error(f"Error handling device reset: {str(e)}", exc_info=True)
         return json_response({"status": "error", "message": "Server error"}, status=500)
@@ -660,6 +663,8 @@ async def get_diary_entries(request):
         # Get user UUID from header
         user_uuid = request.headers.get('X-User-UUID')
         if not user_uuid:
+            diary_logger = logging.getLogger('diary')
+            diary_logger.warning(f"GET /api/diary/entries 400 user: missing_uuid")
             return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
         
         # Get entries from database
@@ -676,46 +681,41 @@ async def get_diary_entries(request):
                 reverse=True
             )
             
+            diary_logger = logging.getLogger('diary')
+            diary_logger.info(f"GET /api/diary/entries 200 user: {user_uuid}")
+            
             return json_response({
                 "status": "success",
                 "data": sorted_entries
             })
     except Exception as e:
         logger.error(f"Error retrieving diary entries: {str(e)}", exc_info=True)
+        diary_logger = logging.getLogger('diary')
+        diary_logger.error(f"GET /api/diary/entries 500 user: {user_uuid if 'user_uuid' in locals() else 'unknown'}")
         return json_response({"status": "error", "message": "Server error"}, status=500)
 
 @app.route('/api/diary/entries', methods=['POST'])
 async def create_diary_entry(request):
     """Create a new diary entry."""
-    # Add request logging
-    logger.info(f"Received diary entry creation request")
+    # Get user UUID from header
+    user_uuid = request.headers.get('X-User-UUID')
+    diary_logger = logging.getLogger('diary')
+    
+    if not user_uuid:
+        diary_logger.warning(f"POST /api/diary/entries 400 user: missing_uuid")
+        return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
     
     try:
-        # Log headers for debugging
-        headers = dict(request.headers)
-        logger.info(f"Request headers: {headers}")
-        
-        # Get user UUID from header
-        user_uuid = request.headers.get('X-User-UUID')
-        if not user_uuid:
-            logger.error("Missing user UUID in request headers")
-            return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
-        
-        logger.info(f"Creating diary entry for user: {user_uuid}")
-        
         # Get diary entry data
         try:
             data = request.json
         except Exception as json_error:
-            logger.error(f"Error parsing JSON: {str(json_error)}")
+            diary_logger.error(f"POST /api/diary/entries 400 user: {user_uuid} - Invalid JSON")
             return json_response({"status": "error", "message": f"Invalid JSON: {str(json_error)}"}, status=400)
             
         if not data:
-            logger.error("Missing diary entry data")
+            diary_logger.error(f"POST /api/diary/entries 400 user: {user_uuid} - Missing data")
             return json_response({"status": "error", "message": "Missing diary entry data"}, status=400)
-        
-        # Log request data for debugging
-        logger.info(f"Diary entry data: {data}")
         
         # Validate required fields
         title = data.get('title')
@@ -723,20 +723,19 @@ async def create_diary_entry(request):
         date = data.get('date')
         
         if not title or not isinstance(title, str):
-            logger.error(f"Invalid title: {title}")
+            diary_logger.error(f"POST /api/diary/entries 400 user: {user_uuid} - Invalid title")
             return json_response({"status": "error", "message": "Invalid title"}, status=400)
         
         if not content or not isinstance(content, str):
-            logger.error(f"Invalid content type or empty content")
+            diary_logger.error(f"POST /api/diary/entries 400 user: {user_uuid} - Invalid content type or empty content")
             return json_response({"status": "error", "message": "Invalid content"}, status=400)
         
         if not date or not isinstance(date, str):
-            logger.error(f"Invalid date: {date}")
+            diary_logger.error(f"POST /api/diary/entries 400 user: {user_uuid} - Invalid date")
             return json_response({"status": "error", "message": "Invalid date"}, status=400)
         
         # Generate UUID for the entry
         entry_uuid = str(uuid.uuid4())
-        logger.info(f"Generated entry UUID: {entry_uuid}")
         
         # Create entry in database
         try:
@@ -745,7 +744,7 @@ async def create_diary_entry(request):
                 user = await UserDB.get_user_by_uuid(session, user_uuid)
                 if not user:
                     # Create user if not exists
-                    logger.info(f"User {user_uuid} not found, creating new user")
+                    diary_logger.info(f"POST /api/diary/entries 200 user: {user_uuid} - User not found, creating new user")
                     user = await UserDB.create_user(session, user_uuid)
                 
                 # Create entry
@@ -761,7 +760,7 @@ async def create_diary_entry(request):
                 )
                 
                 # Log success
-                logger.info(f"Diary entry created successfully: {entry_uuid}")
+                diary_logger.info(f"POST /api/diary/entries 200 user: {user_uuid} entry: {entry_uuid}")
                 
                 # Return the new entry
                 entry_dict = entry.to_dict()
@@ -772,19 +771,21 @@ async def create_diary_entry(request):
                     "data": entry_dict
                 })
         except Exception as db_error:
-            logger.error(f"Database error creating entry: {str(db_error)}", exc_info=True)
+            diary_logger.error(f"POST /api/diary/entries 500 user: {user_uuid} - DB Error")
             return json_response({"status": "error", "message": f"Database error: {str(db_error)}"}, status=500)
     except Exception as e:
-        logger.error(f"Error creating diary entry: {str(e)}", exc_info=True)
+        diary_logger.error(f"POST /api/diary/entries 500 user: {user_uuid} - {str(e)}")
         return json_response({"status": "error", "message": "Server error"}, status=500)
 
 @app.route('/api/diary/entries/<entry_id>', methods=['PUT'])
 async def update_diary_entry(request, entry_id):
     """Update an existing diary entry."""
+    diary_logger = logging.getLogger('diary')
     try:
         # Get user UUID from header
         user_uuid = request.headers.get('X-User-UUID')
         if not user_uuid:
+            diary_logger.warning(f"PUT /api/diary/entries/{entry_id} 400 user: missing_uuid")
             return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
         
         # Get diary entry data
@@ -815,6 +816,9 @@ async def update_diary_entry(request, entry_id):
                 pinned=data.get('pinned')
             )
             
+            # Log success after update
+            diary_logger.info(f"PUT /api/diary/entries/{entry_id} 200 user: {user_uuid}")
+            
             # Return the updated entry
             return json_response({
                 "status": "success",
@@ -822,16 +826,18 @@ async def update_diary_entry(request, entry_id):
                 "data": entry.to_dict()
             })
     except Exception as e:
-        logger.error(f"Error updating diary entry: {str(e)}", exc_info=True)
+        diary_logger.error(f"PUT /api/diary/entries/{entry_id} 500 user: {user_uuid if 'user_uuid' in locals() else 'unknown'}")
         return json_response({"status": "error", "message": "Server error"}, status=500)
 
 @app.route('/api/diary/entries/<entry_id>', methods=['DELETE'])
 async def delete_diary_entry(request, entry_id):
     """Delete a diary entry."""
+    diary_logger = logging.getLogger('diary')
     try:
         # Get user UUID from header
         user_uuid = request.headers.get('X-User-UUID')
         if not user_uuid:
+            diary_logger.warning(f"DELETE /api/diary/entries/{entry_id} 400 user: missing_uuid")
             return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
         
         # Delete entry from database
@@ -849,6 +855,9 @@ async def delete_diary_entry(request, entry_id):
             # Delete entry
             success = await DiaryDB.delete_entry(session, entry_id)
             
+            # Log success
+            diary_logger.info(f"DELETE /api/diary/entries/{entry_id} 200 user: {user_uuid}")
+            
             if success:
                 return json_response({
                     "status": "success",
@@ -857,7 +866,7 @@ async def delete_diary_entry(request, entry_id):
             else:
                 return json_response({"status": "error", "message": "Failed to delete entry"}, status=500)
     except Exception as e:
-        logger.error(f"Error deleting diary entry: {str(e)}", exc_info=True)
+        diary_logger.error(f"DELETE /api/diary/entries/{entry_id} 500 user: {user_uuid if 'user_uuid' in locals() else 'unknown'}")
         return json_response({"status": "error", "message": "Server error"}, status=500)
 
 @app.route('/api/profile-questions', methods=['GET'])
@@ -1012,6 +1021,76 @@ async def intro(request):
         logger.error(f"Error serving intro page: {str(e)}")
         return html("<h1>Error loading page</h1><p>Please try again later.</p>")
 
+@app.route('/api/diary/summary/<date>')
+async def get_diary_summary(request, date):
+    """
+    Get the summary of diary entries for a specific date.
+    
+    Args:
+        request: The request object
+        date: The date to get the summary for in YYYY-MM-DD format
+        
+    Returns:
+        JSON response with the summary
+    """
+    # Get logger for diary operations
+    diary_logger = logging.getLogger('diary')
+    
+    # Get user UUID from header
+    user_uuid = request.headers.get('X-User-UUID')
+    
+    # Validate user UUID
+    if not user_uuid:
+        diary_logger.warning(f"GET /api/diary/summary/{date} 400 user: missing_uuid")
+        return json_response({
+            "status": "error",
+            "message": "Missing user UUID in header",
+            "error_code": "MISSING_USER_UUID"
+        }, status=400)
+    
+    # Validate date format
+    try:
+        # Validate date format (YYYY-MM-DD)
+        datetime.datetime.strptime(date, '%Y-%m-%d')
+    except ValueError:
+        diary_logger.warning(f"GET /api/diary/summary/{date} 400 user: {user_uuid}")
+        return json_response({
+            "status": "error",
+            "message": "Invalid date format. Use YYYY-MM-DD",
+            "error_code": "INVALID_DATE_FORMAT"
+        }, status=400)
+    
+    try:
+        diary_logger.info(f"Retrieving summary for user: {user_uuid}, date: {date}")
+        async with async_session() as session:
+            # Get summary for the date
+            summary = await DiaryDB.get_summary_by_date(session, user_uuid, date)
+            
+            if not summary:
+                diary_logger.info(f"GET /api/diary/summary/{date} 404 user: {user_uuid}")
+                return json_response({
+                    "status": "error",
+                    "message": f"No summary found for date {date}",
+                    "error_code": "NO_SUMMARY_FOUND"
+                }, status=404)
+            
+            # Log success
+            diary_logger.info(f"GET /api/diary/summary/{date} 200 user: {user_uuid}")
+            
+            # Return summary
+            return json_response({
+                "status": "success",
+                "data": summary.to_dict()
+            })
+            
+    except Exception as e:
+        diary_logger.error(f"GET /api/diary/summary/{date} 500 user: {user_uuid} - {str(e)}")
+        return json_response({
+            "status": "error",
+            "message": "An error occurred while retrieving the diary summary",
+            "error_code": "RETRIEVAL_ERROR"
+        }, status=500)
+
 @app.route('/api/diary/summarize/<date>')
 async def summarize_diary_entries(request, date):
     """
@@ -1024,11 +1103,15 @@ async def summarize_diary_entries(request, date):
     Returns:
         JSON response with summarization status
     """
+    # Get logger for diary operations
+    diary_logger = logging.getLogger('diary')
+    
     # Get user UUID from header
     user_uuid = request.headers.get('X-User-UUID')
     
     # Validate user UUID
     if not user_uuid:
+        diary_logger.warning(f"GET /api/diary/summarize/{date} 400 user: missing_uuid")
         return json_response({
             "status": "error",
             "message": "Missing user UUID in header",
@@ -1040,6 +1123,7 @@ async def summarize_diary_entries(request, date):
         # Validate date format (YYYY-MM-DD)
         datetime.datetime.strptime(date, '%Y-%m-%d')
     except ValueError:
+        diary_logger.warning(f"GET /api/diary/summarize/{date} 400 user: {user_uuid}")
         return json_response({
             "status": "error",
             "message": "Invalid date format. Use YYYY-MM-DD",
@@ -1047,44 +1131,49 @@ async def summarize_diary_entries(request, date):
         }, status=400)
     
     try:
+        diary_logger.info(f"Processing summary request for user: {user_uuid}, date: {date}")
         async with async_session() as session:
             # Get all entries for the user on the specified date
             entries = await DiaryDB.get_entries_by_date(session, user_uuid, date)
             
             if not entries:
+                diary_logger.info(f"GET /api/diary/summarize/{date} 404 user: {user_uuid}")
                 return json_response({
                     "status": "error",
                     "message": f"No diary entries found for date {date}",
                     "error_code": "NO_ENTRIES_FOUND"
                 }, status=404)
             
+            diary_logger.info(f"Found {len(entries)} entries for user: {user_uuid}, date: {date}")
+            
             # Format entries for the LLM prompt
             entries_text = ""
             for i, entry in enumerate(entries, 1):
-                entries_text += f"Entry {i} - {entry.title}:\n{entry.content}\n\n"
+                entries_text += f"条目 {i} - {entry.title}:\n{entry.content}\n\n"
             
             # Create prompt for the LLM
             prompt = f"""
-            You are a helpful assistant tasked with summarizing a person's diary entries for a specific day ({date}).
+            你是一位能够总结日记内容的助手，现在需要总结一个人在特定日期（{date}）的所有日记条目。
             
-            Below are all diary entries from that day:
+            以下是这一天的所有日记内容：
             
             {entries_text}
             
-            Please provide a comprehensive summary of these diary entries, highlighting the key events, emotions, and thoughts from the day.
-            The summary should be around 200-300 words, be written in first person as if the diary owner is reflecting on their day, and maintain the emotional tone of the original entries.
+            请提供一份全面的总结，突出这一天的主要事件、情感和想法。
+            总结应该在200-300字左右，以第一人称撰写，就像日记主人在回顾自己的一天，并保持原始条目的情感基调。
             """
             
             # Get response from LLM
             from utils.llm_client import llm_response
             
             messages = [
-                {"role": "system", "content": "You are a helpful assistant that summarizes diary entries."},
+                {"role": "system", "content": "你是一位能够总结日记内容的智能助手。"},
                 {"role": "user", "content": prompt}
             ]
             
             # Get the user for potential personalization
             user = await UserDB.get_user_by_uuid(session, user_uuid)
+            diary_logger.info(f"Sending request to LLM for user: {user_uuid}, date: {date}")
             
             # Generate summary
             summary_response = await llm_response(
@@ -1093,6 +1182,7 @@ async def summarize_diary_entries(request, date):
                 temperature=0.7,
                 max_tokens=500
             )
+            diary_logger.info(f"Received LLM response for user: {user_uuid}, date: {date}")
             
             # Save summary to database
             summary = await DiaryDB.create_or_update_summary(
@@ -1101,6 +1191,10 @@ async def summarize_diary_entries(request, date):
                 date, 
                 summary_response
             )
+            diary_logger.info(f"Summary saved to database for user: {user_uuid}, date: {date}, uuid: {summary.summary_uuid}")
+            
+            # Log success
+            diary_logger.info(f"GET /api/diary/summarize/{date} 200 user: {user_uuid}")
             
             return json_response({
                 "status": "success",
@@ -1114,71 +1208,11 @@ async def summarize_diary_entries(request, date):
             })
             
     except Exception as e:
-        logger.error(f"Error summarizing diary entries: {str(e)}", exc_info=True)
+        diary_logger.error(f"GET /api/diary/summarize/{date} 500 user: {user_uuid} - {str(e)}")
         return json_response({
             "status": "error",
             "message": "An error occurred while summarizing diary entries",
             "error_code": "SUMMARIZATION_ERROR"
-        }, status=500)
-
-@app.route('/api/diary/summary/<date>')
-async def get_diary_summary(request, date):
-    """
-    Get the summary of diary entries for a specific date.
-    
-    Args:
-        request: The request object
-        date: The date to get the summary for in YYYY-MM-DD format
-        
-    Returns:
-        JSON response with the summary
-    """
-    # Get user UUID from header
-    user_uuid = request.headers.get('X-User-UUID')
-    
-    # Validate user UUID
-    if not user_uuid:
-        return json_response({
-            "status": "error",
-            "message": "Missing user UUID in header",
-            "error_code": "MISSING_USER_UUID"
-        }, status=400)
-    
-    # Validate date format
-    try:
-        # Validate date format (YYYY-MM-DD)
-        datetime.datetime.strptime(date, '%Y-%m-%d')
-    except ValueError:
-        return json_response({
-            "status": "error",
-            "message": "Invalid date format. Use YYYY-MM-DD",
-            "error_code": "INVALID_DATE_FORMAT"
-        }, status=400)
-    
-    try:
-        async with async_session() as session:
-            # Get summary for the date
-            summary = await DiaryDB.get_summary_by_date(session, user_uuid, date)
-            
-            if not summary:
-                return json_response({
-                    "status": "error",
-                    "message": f"No summary found for date {date}",
-                    "error_code": "NO_SUMMARY_FOUND"
-                }, status=404)
-            
-            # Return summary
-            return json_response({
-                "status": "success",
-                "data": summary.to_dict()
-            })
-            
-    except Exception as e:
-        logger.error(f"Error getting diary summary: {str(e)}", exc_info=True)
-        return json_response({
-            "status": "error",
-            "message": "An error occurred while retrieving the diary summary",
-            "error_code": "RETRIEVAL_ERROR"
         }, status=500)
 
 # Main entry point
