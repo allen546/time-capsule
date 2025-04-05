@@ -6,6 +6,10 @@
     <title>时间胶囊 - 对话</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="preload" href="/api/chat" as="fetch" crossorigin="anonymous">
+    
+    <!-- Load the user session JavaScript in the head to ensure it's ready before page loads -->
+    <script src="/static/js/userSession.js"></script>
+    
     <style>
         :root {
             --primary-color: #FF7043;
@@ -397,6 +401,133 @@
                 padding: 10px;
             }
         }
+        
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-container {
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalFadeIn 0.3s ease;
+        }
+        
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: var(--font-size-large);
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+        
+        .modal-content {
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .modal-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: var(--font-size-base);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .modal-button:hover {
+            background-color: #E65100;
+        }
+        
+        .modal-button.secondary {
+            background-color: #EEEEEE;
+            color: var(--text-color);
+        }
+        
+        .modal-button.secondary:hover {
+            background-color: #BDBDBD;
+        }
+        
+        /* High contrast mode for modal */
+        :root[data-theme="high-contrast"] .modal-container {
+            background-color: #000000;
+            border: 2px solid var(--secondary-color);
+        }
+        
+        :root[data-theme="high-contrast"] .modal-header,
+        :root[data-theme="high-contrast"] .modal-footer {
+            border-color: var(--secondary-color);
+        }
+        
+        :root[data-theme="high-contrast"] .modal-button.secondary {
+            background-color: #333333;
+            color: white;
+            border: 1px solid var(--secondary-color);
+        }
+        
+        :root[data-theme="high-contrast"] .modal-close {
+            color: var(--secondary-color);
+        }
+        
+        @media (max-width: 768px) {
+            .chat-container {
+                padding: 10px;
+            }
+            
+            .message {
+                max-width: 90%;
+            }
+            
+            .accessibility-panel {
+                bottom: 10px;
+                right: 10px;
+                padding: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -409,7 +540,7 @@
     
     <div class="chat-container">
         <div class="chat-messages" id="chat-messages">
-            <!-- Removed default greeting message -->
+            <!-- Messages will be added here -->
         </div>
         
         <div class="input-container">
@@ -417,6 +548,23 @@
             <button class="voice-btn" id="voiceBtn" aria-label="语音输入">
                 <i class="fas fa-microphone"></i>
             </button>
+        </div>
+    </div>
+    
+    <!-- Modal component for notifications and errors -->
+    <div class="modal-overlay" id="notification-modal" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 id="modal-title">通知</h3>
+                <button class="modal-close" id="modal-close">×</button>
+            </div>
+            <div class="modal-content">
+                <p id="modal-message"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-button" id="modal-primary-button">确定</button>
+                <button class="modal-button secondary" id="modal-secondary-button" style="display: none;">取消</button>
+            </div>
         </div>
     </div>
     
@@ -440,13 +588,166 @@
     </div>
     
     <script>
-        // 立即显示聊天界面，不等待DOM完全加载
-        document.addEventListener('DOMContentLoaded', function() {
+        // Global variable to track alerts that have been shown
+        window.shownAlerts = {};
+        
+        // Safe alert function to prevent duplicates
+        function safeAlert(message) {
+            // Create a hash of the message to use as an ID
+            const msgId = message.replace(/\s+/g, '_').substring(0, 20);
+            
+            // Check if this alert has already been shown
+            if (window.shownAlerts[msgId]) {
+                console.log('Prevented duplicate alert:', message);
+                return;
+            }
+            
+            // Mark this alert as shown
+            window.shownAlerts[msgId] = true;
+            
+            // Show the message in modal instead of alert
+            showModal('提示', message);
+        }
+        
+        // Override the standard alert with our safe version
+        const originalAlert = window.alert;
+        window.alert = safeAlert;
+        
+        // Simple logging function
+        function log(type, message, data) {
+            const prefix = `[Chat] ${type.toUpperCase()}: `;
+            
+            // Only log data if it exists and we're not in production
+            if (data !== undefined) {
+                console[type.toLowerCase()](prefix + message, data);
+            } else {
+                console[type.toLowerCase()](prefix + message);
+            }
+        }
+        
+        // Add message function to display messages in the chat
+        function addMessage(message, type, timestamp = new Date()) {
+            const chatMessages = document.getElementById('chat-messages');
+            const isUser = type === 'user';
+            
+            // Create message container
+            const messageContainer = document.createElement('div');
+            messageContainer.className = `message ${type}-message`;
+            
+            // Format timestamp
+            const formattedTime = formatTime(timestamp);
+            
+            // Add content and timestamp
+            messageContainer.innerHTML = `
+                <div class="message-content">${formatMessage(message)}</div>
+                <div class="message-time">${formattedTime}</div>
+            `;
+            
+            // Add to chat
+            chatMessages.appendChild(messageContainer);
+            
+            // Scroll to bottom
+            scrollToBottom();
+        }
+        
+        // Flag to track if chat is initialized
+        let chatInitialized = false;
+        
+        // Ensure user UUID is available
+        async function ensureUserUUID() {
+            let userUUID = localStorage.getItem('userUUID');
+            
+            if (!userUUID) {
+                log('info', 'No UUID found, initializing UserSession');
+                try {
+                    // Try to get session data from UserSession
+                    if (typeof UserSession !== 'undefined') {
+                        const sessionData = await UserSession.initialize();
+                        if (sessionData && sessionData.uuid) {
+                            userUUID = sessionData.uuid;
+                            log('info', 'UUID initialized', userUUID);
+                        }
+                    } else {
+                        log('error', 'UserSession is not defined');
+                    }
+                } catch (e) {
+                    log('error', 'Error initializing UserSession', e);
+                }
+            } else {
+                log('info', 'UUID found', userUUID);
+            }
+            
+            return userUUID;
+        }
+        
+        // 页面加载后立即显示聊天界面
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 确保用户UUID已经初始化
+            const userUUID = await ensureUserUUID();
+            
+            if (!userUUID) {
+                log('error', 'Could not initialize user UUID');
+                showModal('错误', '用户身份初始化失败，请刷新页面重试。', '刷新页面', () => {
+                    window.location.reload();
+                });
+                return;
+            }
+            
+            // Check profile completeness before initializing chat
+            try {
+                log('info', 'Checking user profile completeness');
+                const response = await fetch('/api/users/profile', {
+                    method: 'GET',
+                    headers: {
+                        'X-User-UUID': userUUID,
+                        'Cache-Control': 'no-cache, no-store'
+                    }
+                });
+                
+                if (!response.ok) {
+                    log('warn', 'Failed to get user profile', response.status);
+                    // Continue initialization even if profile check fails
+                } else {
+                    const userData = await response.json();
+                    if (userData.status === 'success' && userData.data) {
+                        const userProfile = userData.data;
+                        const profileComplete = (
+                            userProfile.name && 
+                            typeof userProfile.profile_data === 'object' && 
+                            Object.keys(userProfile.profile_data).length > 0
+                        );
+                        
+                        if (!profileComplete) {
+                            log('info', 'User profile incomplete, showing profile redirect modal');
+                            showModal(
+                                '完善个人资料', 
+                                '请先完善您的个人资料，以便我更好地为您提供服务。', 
+                                '前往完善资料', 
+                                () => { window.location.href = '/profile'; },
+                                '稍后再说',
+                                () => { initChat(); }
+                            );
+                            return;
+                        } else {
+                            log('info', 'User profile is complete', userProfile.name);
+                        }
+                    }
+                }
+            } catch (error) {
+                log('error', 'Error checking user profile', error);
+                // Continue with initialization despite profile check error
+            }
+            
             // 初始化聊天界面
             initChat();
         });
         
         function initChat() {
+            if (chatInitialized) return;
+            chatInitialized = true;
+            
+            log('info', 'Initializing chat interface');
+            
             const chatMessages = document.getElementById('chat-messages');
             const messageInput = document.getElementById('message-input');
             const voiceBtn = document.getElementById('voiceBtn');
@@ -477,112 +778,99 @@
                 stopRecording();
             });
             
+            // Log device ID
+            const userUUID = localStorage.getItem('userUUID');
+            log('info', 'Using device ID', userUUID);
+            
             // 加载聊天历史
             loadChatHistory();
         }
         
-        // 发送消息
-        async function sendMessage() {
-            const messageInput = document.getElementById('message-input');
-            const message = messageInput.value.trim();
+        // 获取当前聊天ID
+        async function getChatId() {
+            // First check URL for existing session ID
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionIdFromUrl = urlParams.get('id');
             
-            if (!message) return;
+            if (sessionIdFromUrl) {
+                log('info', 'Using session ID from URL', sessionIdFromUrl);
+                return sessionIdFromUrl;
+            }
             
-            // 清空输入框
-            messageInput.value = '';
+            // If no session ID in URL, get user UUID
+            const userUUID = await ensureUserUUID();
+            if (!userUUID) {
+                log('error', 'Cannot get chat ID: No user UUID available');
+                return null;
+            }
             
-            // 添加用户消息到聊天界面
-            addMessage(message, 'user');
-            
-            // 显示正在输入指示器
-            const typingIndicator = document.createElement('div');
-            typingIndicator.className = 'typing-indicator';
-            typingIndicator.innerHTML = `
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            `;
-            
-            const chatMessages = document.getElementById('chat-messages');
-            chatMessages.appendChild(typingIndicator);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            log('info', 'Fetching session ID for user', userUUID);
             
             try {
-                // 获取用户UUID
-                const userUUID = localStorage.getItem('userUUID');
-                if (!userUUID) {
-                    throw new Error('No user UUID found');
-                }
-                
-                // 获取当前聊天ID
-                let chatId = getChatId();
-                let apiUrl = '/api/chat';
-                let requestData = {
-                    message: message,
-                    user_uuid: userUUID
-                };
-                
-                // 如果有聊天ID，使用sessions API
-                if (chatId) {
-                    apiUrl = `/api/chat/sessions/${chatId}/messages`;
-                    // sessions API 不需要在请求体中包含chat_id
-                } else {
-                    // 直接API需要传入chat_id (null也要传)
-                    requestData.chat_id = null;
-                }
-                
-                // 发送消息到服务器
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
+                // Fetch sessions for this user
+                const response = await fetch('/api/chat/sessions', {
+                    method: 'GET',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-User-UUID': userUUID
-                    },
-                    body: JSON.stringify(requestData),
+                        'X-User-UUID': userUUID,
+                        'Cache-Control': 'no-cache, no-store'
+                    }
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`Failed to send message: ${response.status}`);
+                    log('error', 'Failed to get sessions', response.status);
+                    return null;
                 }
                 
-                const data = await response.json();
+                const sessions = await response.json();
+                log('info', `Found ${sessions.length} sessions`);
                 
-                // 移除正在输入指示器
-                typingIndicator.remove();
-                
-                // 处理不同API格式的响应
-                if (data.status === 'success' && data.data && data.data.ai_response) {
-                    // 新sessions API 格式
-                    addMessage(data.data.ai_response.content, 'ai');
-                } else if (data.response) {
-                    // 旧API格式
-                    addMessage(data.response, 'ai');
-                } else {
-                    console.warn('Unexpected response format:', data);
-                    addMessage('收到响应，但格式异常', 'ai');
+                // If user has sessions, use the first one
+                if (sessions.length > 0) {
+                    const sessionId = sessions[0].id;
+                    
+                    // Update URL with session ID for future reference
+                    updateChatId(sessionId);
+                    
+                    log('info', 'Selected session ID', sessionId);
+                    return sessionId;
                 }
                 
-                // 如果是新对话，更新URL中的聊天ID
-                if (!chatId) {
-                    if (data.chat_id) {
-                        updateChatId(data.chat_id);
-                    } else if (data.data && data.data.ai_response && data.data.ai_response.session_id) {
-                        updateChatId(data.data.ai_response.session_id);
-                    }
+                // If no sessions found, create a new one
+                log('info', 'Creating new session');
+                
+                const createResponse = await fetch('/api/chat/sessions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-UUID': userUUID,
+                        'Cache-Control': 'no-cache, no-store'
+                    },
+                    body: JSON.stringify({ user_uuid: userUUID })
+                });
+                
+                if (!createResponse.ok) {
+                    log('error', 'Failed to create session', createResponse.status);
+                    return null;
                 }
+                
+                const newSession = await createResponse.json();
+                const newSessionId = newSession.id || newSession.session_uuid;
+                
+                if (!newSessionId) {
+                    log('error', 'Created session but no ID returned');
+                    return null;
+                }
+                
+                // Update URL with new session ID
+                updateChatId(newSessionId);
+                
+                log('info', 'Created new session ID', newSessionId);
+                return newSessionId;
+                
             } catch (error) {
-                // 移除正在输入指示器
-                typingIndicator.remove();
-                
-                console.error('Error:', error);
-                addMessage('抱歉，发生了错误，请稍后再试。', 'ai');
+                log('error', 'Error getting chat ID', error);
+                return null;
             }
-        }
-        
-        // 获取当前聊天ID
-        function getChatId() {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get('id');
         }
         
         // 更新URL中的聊天ID
@@ -594,26 +882,39 @@
         
         // 加载聊天历史
         async function loadChatHistory() {
-            const chatId = getChatId();
-            if (!chatId) return;
+            const chatId = await getChatId();
+            if (!chatId) {
+                log('info', 'No chat ID, skipping history load');
+                return;
+            }
             
             try {
                 // 获取用户UUID
-                const userUUID = localStorage.getItem('userUUID');
+                const userUUID = await ensureUserUUID();
                 if (!userUUID) {
                     throw new Error('No user UUID found');
                 }
                 
+                log('info', 'Loading chat history', { session: chatId, user: userUUID });
+                
                 const response = await fetch(`/api/chat/sessions/${chatId}/messages`, {
                     headers: {
-                        'X-User-UUID': userUUID
+                        'X-User-UUID': userUUID,
+                        'Cache-Control': 'no-cache, no-store'
                     }
                 });
+                
                 if (!response.ok) {
-                    throw new Error('Failed to load chat history');
+                    if (response.status === 404) {
+                        log('warn', 'Chat session not found', chatId);
+                        addMessage('Chat session not found. Starting new conversation.', 'ai');
+                        return;
+                    }
+                    throw new Error(`Failed to load chat history: ${response.status}`);
                 }
                 
                 const data = await response.json();
+                
                 const chatMessages = document.getElementById('chat-messages');
                 
                 // 清空现有消息
@@ -638,44 +939,175 @@
                         // 添加到聊天
                         chatMessages.appendChild(messageContainer);
                     });
+                    
+                    log('info', `Loaded ${data.data.length} messages`);
                 } else {
-                    console.warn('Unexpected response format:', data);
+                    log('warn', 'Unexpected response format');
                     if (data.messages && Array.isArray(data.messages)) {
                         // 兼容旧格式
                         data.messages.forEach(msg => {
                             addMessage(msg.content, msg.is_user ? 'user' : 'ai', new Date(msg.created_at));
                         });
+                        log('info', `Loaded ${data.messages.length} messages (old format)`);
+                    } else {
+                        log('error', 'No messages found in response');
                     }
                 }
                 
                 // 滚动到底部
                 scrollToBottom();
             } catch (error) {
-                console.error('Error loading chat history:', error);
+                log('error', 'Error loading chat history', error);
                 addMessage('无法加载聊天历史，请刷新页面重试。', 'ai');
             }
         }
         
-        // 添加消息到聊天界面
-        function addMessage(text, sender, timestamp = new Date()) {
-            const chatMessages = document.getElementById('chat-messages');
-            const messageContainer = document.createElement('div');
-            messageContainer.className = `message ${sender}-message`;
+        // 发送消息
+        async function sendMessage() {
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
             
-            // 格式化时间戳
-            const formattedTime = formatTime(timestamp);
+            if (!message) return;
             
-            // 添加内容和时间戳
-            messageContainer.innerHTML = `
-                <div class="message-content">${formatMessage(text)}</div>
-                <div class="message-time">${formattedTime}</div>
+            // 清空输入框
+            messageInput.value = '';
+            
+            // Log user message
+            log('info', 'User message:', message);
+            
+            // 添加用户消息到聊天界面
+            addMessage(message, 'user');
+            
+            // 显示正在输入指示器
+            const typingIndicator = document.createElement('div');
+            typingIndicator.className = 'typing-indicator';
+            typingIndicator.innerHTML = `
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
             `;
             
-            // 添加到聊天
-            chatMessages.appendChild(messageContainer);
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.appendChild(typingIndicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
             
-            // 滚动到底部
-            scrollToBottom();
+            try {
+                // 获取用户UUID
+                const userUUID = await ensureUserUUID();
+                if (!userUUID) {
+                    throw new Error('No user UUID found');
+                }
+                
+                // 获取当前聊天ID
+                let chatId = await getChatId();
+                let apiUrl = '/api/chat';
+                let requestData = {
+                    message: message,
+                    user_uuid: userUUID
+                };
+                
+                // 如果有聊天ID，使用sessions API
+                if (chatId) {
+                    apiUrl = `/api/chat/sessions/${chatId}/messages`;
+                    log('info', 'Sending message to session', chatId);
+                } else {
+                    // 直接API需要传入chat_id (null也要传)
+                    requestData.chat_id = null;
+                    log('info', 'Sending message with no session ID');
+                }
+                
+                // 发送消息到服务器
+                log('info', 'API Request', { url: apiUrl, uuid: userUUID });
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-UUID': userUUID,
+                        'Cache-Control': 'no-cache, no-store'
+                    },
+                    body: JSON.stringify(requestData),
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to send message: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // 移除正在输入指示器
+                typingIndicator.remove();
+                
+                let aiResponse = '';
+                
+                // 处理不同API格式的响应
+                if (data.status === 'success' && data.data && data.data.ai_response) {
+                    // 新sessions API 格式
+                    aiResponse = data.data.ai_response.content;
+                    addMessage(aiResponse, 'ai');
+                } else if (data.response) {
+                    // 旧API格式
+                    aiResponse = data.response;
+                    addMessage(aiResponse, 'ai');
+                } else if (data.status === 'redirect') {
+                    // Handle profile redirect with modal instead of inline message
+                    log('info', 'Received redirect response', data);
+                    
+                    // Enhanced debugging with visual separation for redirect logs
+                    console.warn('----------------------');
+                    console.warn('🔴 PROFILE REDIRECT DETECTED!');
+                    console.warn('🔴 Redirect URL:', data.redirect_url);
+                    console.warn('🔴 Message:', data.message);
+                    console.warn('🔴 Full response:', data);
+                    console.warn('----------------------');
+                    
+                    // Show modal instead of adding message to chat
+                    showModal(
+                        '需要完善个人资料', 
+                        data.message || '请先完善您的个人资料，以便我更好地为您提供服务。', 
+                        '前往完善资料', 
+                        () => { window.location.href = data.redirect_url || '/profile'; },
+                        '稍后再说',
+                        null
+                    );
+                    return; // Early return to prevent further processing
+                } else {
+                    log('warn', 'Unexpected response format');
+                    aiResponse = '收到响应，但格式异常';
+                    addMessage(aiResponse, 'ai');
+                }
+                
+                // Log AI response
+                log('info', 'AI response:', aiResponse);
+                
+                // 如果是新对话，更新URL中的聊天ID
+                if (!chatId) {
+                    if (data.chat_id) {
+                        updateChatId(data.chat_id);
+                    } else if (data.data && data.data.ai_response && data.data.ai_response.session_id) {
+                        updateChatId(data.data.ai_response.session_id);
+                    }
+                }
+            } catch (error) {
+                // 移除正在输入指示器
+                typingIndicator.remove();
+                
+                log('error', 'Error sending message', error);
+                
+                // Show error in modal instead of message
+                showModal(
+                    '发送消息失败', 
+                    '抱歉，发生了错误，请稍后再试。<br><small style="color: var(--text-secondary);">错误详情：' + error.message + '</small>', 
+                    '重试', 
+                    () => {
+                        // Re-add the message to input and focus
+                        messageInput.value = message;
+                        messageInput.focus();
+                    }
+                );
+                
+                // Log error response
+                log('error', 'AI error response:', error.message);
+            }
         }
         
         /**
@@ -714,7 +1146,7 @@
         
         function startRecording() {
             if (!('webkitSpeechRecognition' in window)) {
-                alert('您的浏览器不支持语音识别功能，请使用Chrome浏览器。');
+                safeAlert('您的浏览器不支持语音识别功能，请使用Chrome浏览器。');
                 return;
             }
             
@@ -953,6 +1385,76 @@
                 });
             }
         })();
+        
+        // Modal functionality
+        const modalOverlay = document.getElementById('notification-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalClose = document.getElementById('modal-close');
+        const modalPrimaryButton = document.getElementById('modal-primary-button');
+        const modalSecondaryButton = document.getElementById('modal-secondary-button');
+        
+        // Function to show modal
+        function showModal(title, message, primaryButtonText, primaryAction, secondaryButtonText = null, secondaryAction = null) {
+            // Set modal content
+            modalTitle.textContent = title || '通知';
+            modalMessage.innerHTML = message;
+            modalPrimaryButton.textContent = primaryButtonText || '确定';
+            
+            // Set up button actions
+            modalPrimaryButton.onclick = () => {
+                hideModal();
+                if (typeof primaryAction === 'function') {
+                    primaryAction();
+                }
+            };
+            
+            // Handle secondary button
+            if (secondaryButtonText && secondaryAction) {
+                modalSecondaryButton.textContent = secondaryButtonText;
+                modalSecondaryButton.style.display = 'block';
+                modalSecondaryButton.onclick = () => {
+                    hideModal();
+                    if (typeof secondaryAction === 'function') {
+                        secondaryAction();
+                    }
+                };
+            } else {
+                modalSecondaryButton.style.display = 'none';
+            }
+            
+            // Show modal
+            modalOverlay.style.display = 'flex';
+            
+            // Add escape key listener
+            document.addEventListener('keydown', handleEscapeKey);
+            
+            // Log modal display
+            log('info', 'Showing modal', { title, message });
+        }
+        
+        // Function to hide modal
+        function hideModal() {
+            modalOverlay.style.display = 'none';
+            document.removeEventListener('keydown', handleEscapeKey);
+        }
+        
+        // Close modal when clicking close button
+        modalClose.addEventListener('click', hideModal);
+        
+        // Close modal when pressing escape key
+        function handleEscapeKey(event) {
+            if (event.key === 'Escape') {
+                hideModal();
+            }
+        }
+        
+        // Close modal when clicking outside
+        modalOverlay.addEventListener('click', function(event) {
+            if (event.target === modalOverlay) {
+                hideModal();
+            }
+        });
     </script>
 </body>
 </html> 

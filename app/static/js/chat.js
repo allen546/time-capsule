@@ -129,10 +129,25 @@ async function initChat() {
             return;
         }
         
-        logInfo(`Initializing chat for user ${sessionData.uuid.substring(0, 8)}...`);
+        // Explicitly log the UUID and verify it exists
+        logInfo(`Initializing chat for user UUID: ${sessionData.uuid}`);
         
-        // Store user UUID in localStorage to ensure it's available for API calls
+        // Ensure UUID is properly stored in localStorage for API calls
         localStorage.setItem('userUUID', sessionData.uuid);
+        
+        // Verify the UUID is actually set correctly
+        const storedUUID = localStorage.getItem('userUUID');
+        if (!storedUUID) {
+            logError('Failed to store user UUID in localStorage');
+            window.location.href = '/profile';
+            return;
+        }
+        
+        if (storedUUID !== sessionData.uuid) {
+            logWarn(`UUID mismatch: sessionData.uuid (${sessionData.uuid}) doesn't match localStorage (${storedUUID})`);
+            // Force synchronize
+            localStorage.setItem('userUUID', sessionData.uuid);
+        }
         
         // Generate a user-specific session ID
         currentSessionId = generateSessionId(sessionData.uuid);
@@ -170,7 +185,9 @@ async function initChat() {
 function generateSessionId(userUuid) {
     if (!userUuid) return 'default-session';
     
-    // Use the UUID directly without any prefix to match database expectations
+    // We'll use a temporary placeholder session ID
+    // The actual session ID will be determined during loadChatMessages
+    // when we query the database for existing sessions
     return userUuid;
 }
 
@@ -228,21 +245,58 @@ function getConnectionInfo() {
 }
 
 /**
+ * API request with cache busting
+ * Wraps fetch with proper headers and cache control
+ */
+async function apiRequest(url, options = {}) {
+    // Ensure options has the structure we need
+    options = {
+        method: 'GET',
+        headers: {},
+        ...options
+    };
+    
+    // Ensure headers exist
+    options.headers = {
+        'Content-Type': 'application/json',
+        ...options.headers
+    };
+    
+    // Add cache control headers
+    options.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    options.headers['Pragma'] = 'no-cache';
+    options.headers['Expires'] = '0';
+    
+    // Add timestamp to URL for GET requests to prevent caching
+    if (options.method === 'GET') {
+        const separator = url.includes('?') ? '&' : '?';
+        url = `${url}${separator}_t=${Date.now()}`;
+    }
+    
+    logDebug(`API Request: ${options.method} ${url}`);
+    return fetch(url, options);
+}
+
+/**
  * Load chat messages for a session
  */
 async function loadChatMessages(sessionId) {
     if (!sessionId) {
         logWarn('No session ID provided to loadChatMessages');
-        return;
+        return false;
     }
     
     try {
-        logInfo(`Loading chat messages for session ${sessionId}`);
-        
         const userUUID = localStorage.getItem('userUUID');
         if (!userUUID) {
+            logError('Fatal error: No user UUID found in localStorage during loadChatMessages');
             throw new Error('No user UUID found');
         }
+        
+        logInfo(`Loading chat messages for user ${userUUID}, using user UUID as session ID`);
+        
+        // Always use the user's UUID as the session ID
+        currentSessionId = userUUID;
         
         // Clear chat display
         chatMessages.innerHTML = '';
@@ -253,80 +307,92 @@ async function loadChatMessages(sessionId) {
         // Show loading indicator
         showLoadingIndicator();
         
-        // Fetch messages from the server
-        const response = await fetch(`/api/chat/sessions/${sessionId}/messages`, {
+        // Explicitly log the headers we're going to send
+        const headers = {
+            'X-User-UUID': userUUID
+        };
+        logInfo(`API Request headers for messages:`, headers);
+        
+        // Always directly fetch messages using the user UUID as session ID
+        logInfo(`Directly fetching messages for user session ${currentSessionId}`);
+        const response = await apiRequest(`/api/chat/sessions/${currentSessionId}/messages`, {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-UUID': userUUID
-            }
+            headers: headers
         });
         
-        // Check response
+        logInfo(`Messages API Response status: ${response.status}, ${response.statusText}`);
+        
         if (response.status === 404) {
-            // Session not found, create a new one
-            logWarn(`Chat session ${sessionId} not found, creating a new one`);
-            currentSessionId = generateSessionId(userUUID);
+            logInfo(`No chat session found for ${userUUID}, creating one`);
+            
+            // Create a session with the user UUID as ID
+            const createResponse = await apiRequest('/api/chat/sessions', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({ user_uuid: userUUID, session_id: userUUID })
+            });
+            
+            if (!createResponse.ok) {
+                logWarn(`Failed to create session: ${createResponse.status}, continuing with empty chat`);
+            } else {
+                logInfo(`Created user session: ${userUUID}`);
+            }
             
             // Show empty state
             emptyChatState.style.display = 'flex';
             hideLoadingIndicator();
-            return;
+            return false;
         }
         
         if (!response.ok) {
+            logError(`Messages fetch failed with status: ${response.status}, ${response.statusText}`);
             throw new Error(`Server responded with ${response.status}`);
         }
         
-        const data = await response.json();
-        logInfo(`Chat history response:`, data);
+        // Get raw response text for debugging
+        const rawResponseText = await response.text();
+        logInfo(`Raw messages response: ${rawResponseText.substring(0, 200)}...`);
         
-        if (!data.status || data.status !== 'success') {
-            if (data.error) {
-                throw new Error(data.error);
-            }
-            // Try to handle different response formats
-            // Some endpoints might return messages directly without the status wrapper
-            if (!Array.isArray(data)) {
-                // Try to extract messages from data if it's not an array itself
-                if (data.data && Array.isArray(data.data)) {
-                    // Use data.data if it exists and is an array
-                    messages = data.data;
-                } else if (data.messages && Array.isArray(data.messages)) {
-                    // Use data.messages if it exists and is an array
-                    messages = data.messages;
-                } else {
-                    // Default to empty array if we can't find messages
-                    messages = [];
-                }
-            } else {
-                // If data is already an array, use it directly
-                messages = data;
-            }
-        } else {
-            // Standard response format
-            messages = data.data || [];
+        // Parse as JSON
+        let data;
+        try {
+            data = JSON.parse(rawResponseText);
+        } catch (e) {
+            logError(`Error parsing messages response as JSON: ${e.message}`);
+            throw new Error(`Invalid JSON in server response: ${e.message}`);
         }
         
-        // Hide empty state when messages are loaded
-        emptyChatState.style.display = 'none';
+        logInfo(`Received chat history for session ${currentSessionId}`);
         
-        logInfo(`Loaded ${messages.length} messages for session ${sessionId}`);
+        // Extract messages from the response, handling different response formats
+        let messages = [];
         
-        // No messages, show empty state
-        if (messages.length === 0) {
-            emptyChatState.style.display = 'flex';
-        } else {
-            // Load existing messages 
-            for (const message of messages) {
-                // Handle different message formats
-                const isUser = message.sender === 'user' || message.is_user === true;
-                const content = message.content || message.message || '';
-                const timestamp = message.created_at || message.timestamp || new Date().toISOString();
+        if (data.status === 'success' && Array.isArray(data.data)) {
+            messages = data.data;
+        } else if (Array.isArray(data)) {
+            messages = data;
+        } else if (data.data && Array.isArray(data.data)) {
+            messages = data.data;
+        } else if (data.messages && Array.isArray(data.messages)) {
+            messages = data.messages;
+        }
+        
+        logInfo(`Extracted ${messages.length} messages from response for session ${currentSessionId}`);
+        
+        // If we have messages, display them
+        if (messages.length > 0) {
+            emptyChatState.style.display = 'none';
+            
+            // Process and display each message
+            logInfo(`Processing ${messages.length} messages to display`);
+            for (const msg of messages) {
+                const isUser = msg.is_user;
+                const content = msg.content || msg.message;
+                const timestamp = msg.created_at || msg.timestamp || new Date().toISOString();
+                const isError = content && content.startsWith('Error:');
+                const isMock = content && (content.startsWith('Echo:') || content.includes('this is just a mock response'));
                 
-                // Check if this is a mock or error message
-                const isMock = !isUser && (content.startsWith('Echo:') || content.includes('this is just a mock response'));
-                const isError = !isUser && content.startsWith('Error:');
+                logDebug(`Adding message to chat: ${isUser ? 'User' : 'AI'}, ${new Date(timestamp).toISOString()}, ${content.substring(0, 30)}...`);
                 
                 // Add with appropriate styling
                 addMessageToChat(content, isUser, new Date(timestamp), isError, isMock);
@@ -337,12 +403,22 @@ async function loadChatMessages(sessionId) {
             
             // Ensure chat is scrolled to bottom with history
             scrollToBottom();
+            
+            // Hide empty state since we have messages
+            emptyChatState.style.display = 'none';
+            
+            hideLoadingIndicator();
+            logInfo(`Successfully loaded ${messages.length} messages for session ${currentSessionId}`);
+            return true;
+        } else {
+            // No messages found
+            logInfo(`No messages found in session ${currentSessionId}`);
+            emptyChatState.style.display = 'flex';
+            hideLoadingIndicator();
+            return false;
         }
-        
-        // Hide loading indicator
-        hideLoadingIndicator();
     } catch (error) {
-        logError('Error loading chat messages:', error);
+        logError(`Error loading chat messages for session ${sessionId}:`, error);
         showError('无法加载聊天记录，请刷新页面重试');
         
         // Hide loading indicator
@@ -350,6 +426,7 @@ async function loadChatMessages(sessionId) {
         
         // Show empty state on error
         emptyChatState.style.display = 'flex';
+        return false;
     }
 }
 
@@ -578,10 +655,9 @@ async function clearChat() {
         }
         
         // Delete chat session via API
-        const response = await fetch(`/api/chat/sessions/${currentSessionId}`, {
+        const response = await apiRequest(`/api/chat/sessions/${currentSessionId}`, {
             method: 'DELETE',
             headers: {
-                'Content-Type': 'application/json',
                 'X-User-UUID': userUUID
             }
         });
@@ -807,25 +883,33 @@ function showError(message) {
  */
 function logDebug(...args) {
     if (CURRENT_LOG_LEVEL <= LOG_LEVEL.DEBUG) {
-        console.debug('[Chat]', ...args);
+        const timestamp = new Date().toISOString();
+        const sessionInfo = currentSessionId ? `[Session: ${currentSessionId.substring(0, 8)}]` : '[No Session]';
+        console.debug(`[Chat][${timestamp}]${sessionInfo}`, ...args);
     }
 }
 
 function logInfo(...args) {
     if (CURRENT_LOG_LEVEL <= LOG_LEVEL.INFO) {
-        console.info('[Chat]', ...args);
+        const timestamp = new Date().toISOString();
+        const sessionInfo = currentSessionId ? `[Session: ${currentSessionId.substring(0, 8)}]` : '[No Session]';
+        console.info(`[Chat][${timestamp}]${sessionInfo}`, ...args);
     }
 }
 
 function logWarn(...args) {
     if (CURRENT_LOG_LEVEL <= LOG_LEVEL.WARN) {
-        console.warn('[Chat]', ...args);
+        const timestamp = new Date().toISOString();
+        const sessionInfo = currentSessionId ? `[Session: ${currentSessionId.substring(0, 8)}]` : '[No Session]';
+        console.warn(`[Chat][${timestamp}]${sessionInfo}`, ...args);
     }
 }
 
 function logError(...args) {
     if (CURRENT_LOG_LEVEL <= LOG_LEVEL.ERROR) {
-        console.error('[Chat]', ...args);
+        const timestamp = new Date().toISOString();
+        const sessionInfo = currentSessionId ? `[Session: ${currentSessionId.substring(0, 8)}]` : '[No Session]';
+        console.error(`[Chat][${timestamp}]${sessionInfo}`, ...args);
     }
 }
 
@@ -836,6 +920,7 @@ async function sendUserMessage(message) {
     try {
         const userUUID = localStorage.getItem('userUUID');
         if (!userUUID) {
+            logError('No user UUID found in localStorage');
             throw new Error('No user UUID found');
         }
         
@@ -846,31 +931,40 @@ async function sendUserMessage(message) {
             chat_id: currentSessionId
         };
         
+        logInfo(`Sending message to session ${currentSessionId}, length: ${message.length} chars, first 30 chars: "${message.substring(0, 30)}..."`);
+        
         // Show loading indicator
         showLoadingIndicator();
         
         // Ensure we're scrolled to the bottom when loading
         scrollToBottom();
         
-        // Send message to the server
-        const response = await fetch(`/api/chat/sessions/${currentSessionId}/messages`, {
+        // Send message to the server with cache busting
+        const startTime = new Date().getTime();
+        const response = await apiRequest(`/api/chat/sessions/${currentSessionId}/messages`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
                 'X-User-UUID': userUUID,
                 'X-Client-ID': clientId
             },
             body: JSON.stringify(requestData)
         });
+        const endTime = new Date().getTime();
+        const responseTime = endTime - startTime;
+        
+        logInfo(`Server response received in ${responseTime}ms, status: ${response.status}, ${response.statusText}`);
         
         if (response.status === 403) {
             // Check if server suggested a new session ID
             const data = await response.json();
+            logWarn(`Received 403 response with data:`, data);
+            
             if (data.new_session_id) {
                 logInfo(`Server suggested new session ID: ${data.new_session_id}`);
                 currentSessionId = data.new_session_id;
                 
                 // Try sending the message again with the new session ID
+                logInfo(`Retrying message with new session ID: ${currentSessionId}`);
                 return await sendUserMessage(message);
             }
             
@@ -878,13 +972,16 @@ async function sendUserMessage(message) {
         }
         
         if (!response.ok) {
+            logError(`Error response from server: ${response.status}, ${response.statusText}`);
             throw new Error(`Server responded with ${response.status}`);
         }
         
         const data = await response.json();
-        logInfo("API response:", data);
+        logInfo(`Message sent successfully, response size: ${JSON.stringify(data).length} bytes`);
+        logDebug(`Full API response:`, data);
         
         if (data.status !== 'success') {
+            logError(`API returned error status: ${data.status}`, data.message || 'No error message');
             throw new Error(data.message || 'Unknown error');
         }
         
@@ -896,11 +993,14 @@ async function sendUserMessage(message) {
         // Extract the message from the response, handling different response formats
         const responseText = aiResponse.message || aiResponse.content || '';
         
-        logInfo("Processing response text:", responseText);
+        logInfo(`Processing AI response, length: ${responseText.length} chars, first 30 chars: "${responseText.substring(0, 30)}..."`);
         
         // Check if this is a mock or error message
         const isMock = responseText.startsWith('Echo:') || responseText.includes('this is just a mock response');
         const isError = responseText.startsWith('Error:');
+        
+        if (isMock) logInfo('Mock response detected');
+        if (isError) logWarn('Error response detected');
         
         // Add message to chat with appropriate flags
         addMessageToChat(
@@ -922,6 +1022,7 @@ async function sendUserMessage(message) {
         
         // Process next message if queue has items
         if (messageQueue.length > 0) {
+            logInfo(`Message queue has ${messageQueue.length} items, processing next message`);
             processMessageQueue();
         }
         
@@ -934,7 +1035,7 @@ async function sendUserMessage(message) {
         // Mark message as processed (despite error)
         isPendingResponse = false;
         
-        logError('Error sending message to server:', error);
+        logError(`Error sending message to server:`, error);
         
         // Show error message in chat
         const errorMessage = `Error: ${error.message}`;

@@ -34,6 +34,16 @@ USE_MOCK_RESPONSE = not DEEPSEEK_API_KEY
 # Import the Chinese prompt template
 from utils.zh_prompt_template import ZH_PROMPT_TEMPLATE, ZH_DEFAULT_PROMPT
 
+# Import app configuration if this module is imported on its own
+try:
+    from config import CONFIG, get_secret
+except ImportError:
+    import os
+    import sys
+    # Add the parent directory to the path
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from config import CONFIG, get_secret
+
 class LLMProvider(Enum):
     """Supported LLM API providers."""
     OPENAI = "openai"
@@ -98,28 +108,36 @@ class LLMClient:
             retry_delay: Initial delay between retries (increases exponentially)
         """
         if isinstance(provider, str):
-            provider = LLMProvider(provider.lower())
+            try:
+                self.provider = LLMProvider(provider.lower())
+            except ValueError:
+                logger.warning(f"Unknown provider: {provider}, defaulting to OpenAI")
+                self.provider = LLMProvider.OPENAI
+        else:
+            self.provider = provider
         
-        self.provider = provider
+        logger.info(f"Using LLM provider: {self.provider.value}")
+        
+        # Set base URL based on provider
+        self.base_url = base_url or self._get_default_base_url()
+        
+        # Set API key based on provider
+        self.api_key = api_key or os.environ.get(self._get_api_key_env_var()) or get_secret(self._get_api_key_env_var())
+        if not self.api_key:
+            logger.warning(f"No API key provided for {self.provider.value}. API calls will fail!")
+        
+        # Client settings
         self.timeout = timeout
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+        
+        # Create session
         self._session = None
         
-        # Set base URL based on provider
-        if base_url:
-            self.base_url = base_url
-        else:
-            self.base_url = self._get_default_base_url()
-        
-        # Set API key based on provider
-        if api_key:
-            self.api_key = api_key
-        else:
-            env_var = self._get_api_key_env_var()
-            self.api_key = os.environ.get(env_var)
-            if not self.api_key:
-                logger.warning(f"No API key provided and environment variable {env_var} not found")
+        # Configure SSL verification based on environment settings
+        self.verify_ssl = CONFIG.get("verify_ssl", True)
+        if not self.verify_ssl:
+            logger.warning("SSL verification is disabled! This is insecure and should only be used in development.")
     
     def _get_default_base_url(self) -> str:
         """Get the default base URL for the selected provider."""
@@ -167,12 +185,22 @@ class LLMClient:
         return headers
     
     async def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create an aiohttp session."""
+        """Get or create the aiohttp session with proper SSL configuration."""
         if self._session is None or self._session.closed:
+            ssl_context = ssl.create_default_context()
+            
+            # Only disable SSL verification if explicitly configured
+            if not self.verify_ssl:
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+            
+            # Create session with configured SSL context
             self._session = aiohttp.ClientSession(
                 headers=self._get_headers(),
-                timeout=aiohttp.ClientTimeout(total=self.timeout)
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
+                connector=aiohttp.TCPConnector(ssl=ssl_context)
             )
+        
         return self._session
     
     async def close(self):
@@ -868,10 +896,14 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
         logger.info(f"[API:{request_id}] Request payload model: {payload['model']}")
         logger.info(f"[API:{request_id}] Request payload message count: {len(payload['messages'])}")
         
-        # Create SSL context to handle certificate verification issues
+        # Create SSL context based on environment configuration
         ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        # Only disable verification in development when explicitly configured
+        if not CONFIG.get("verify_ssl", True):
+            logger.warning(f"[API:{request_id}] SSL verification is disabled! This is insecure and should only be used in development.")
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
         
         # Make API request
         logger.info(f"[API:{request_id}] Sending request to DeepSeek API with {len(messages)} messages")
@@ -923,24 +955,101 @@ async def deepseek_chat_completion(user_message, user_data=None, session_id=None
         logger.warning(f"[API:{request_id}] Using mock response as fallback due to exception")
         return await mock_llm_response(user_message, user_data, session_id, db_session)
 
-async def llm_response(user_message, user_data=None, session_id=None, db_session=None):
+async def llm_response(user_message=None, user_data=None, session_id=None, db_session=None, messages=None, model="deepseek-chat", temperature=0.7, max_tokens=4096):
     """
     Unified function for getting LLM responses - uses DeepSeek API or mock depending on configuration.
     
     Args:
-        user_message: The current user message
+        user_message: The current user message (legacy parameter)
         user_data: User profile data for personalization
         session_id: The current chat session ID
         db_session: Database session for retrieving message history
+        messages: List of message dictionaries with 'role' and 'content' (preferred)
+        model: Model name to use
+        temperature: Temperature parameter for generation
+        max_tokens: Maximum tokens to generate
         
     Returns:
         The AI response from the chosen method
     """
-    # Use mock response if API key is not set or if explicitly configured to use mock
-    if USE_MOCK_RESPONSE:
-        logger.info("Using mock LLM response")
-        return await mock_llm_response(user_message, user_data, session_id, db_session)
+    # Check if mock response is configured
+    USE_MOCK_RESPONSE = not get_secret("DEEPSEEK_API_KEY", os.environ.get("DEEPSEEK_API_KEY", ""))
     
-    # Otherwise use DeepSeek API
-    logger.info("Using DeepSeek API for response")
-    return await deepseek_chat_completion(user_message, user_data, session_id, db_session) 
+    # If messages are provided directly, use them
+    if messages and isinstance(messages, list):
+        try:
+            # Use DeepSeek API or mock
+            if USE_MOCK_RESPONSE:
+                logger.info("Using mock LLM response for direct messages")
+                return "This is a mock response for the provided messages. In production, this would be a proper LLM-generated response."
+            else:
+                # Create SSL context based on environment configuration
+                ssl_context = ssl.create_default_context()
+                
+                # Only disable verification in development when explicitly configured
+                if not CONFIG.get("verify_ssl", True):
+                    logger.warning("SSL verification is disabled! This is insecure and should only be used in development.")
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+                
+                # Get API key
+                api_key = get_secret("DEEPSEEK_API_KEY", os.environ.get("DEEPSEEK_API_KEY", ""))
+                
+                if not api_key:
+                    logger.error("No DeepSeek API key provided, using mock response")
+                    return "This is a mock response. No API key was provided."
+                
+                # Prepare API request
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}"
+                }
+                
+                payload = {
+                    "model": model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens
+                }
+                
+                # Make API request
+                logger.info(f"Sending request to DeepSeek API with {len(messages)} messages")
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://api.deepseek.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=60,
+                        ssl=ssl_context
+                    ) as response:
+                        if response.status != 200:
+                            error_text = await response.text()
+                            logger.error(f"DeepSeek API request failed with status {response.status}: {error_text}")
+                            return "Sorry, I'm having trouble responding right now. Please try again later."
+                        
+                        # Process successful response
+                        result = await response.json()
+                        try:
+                            content = result["choices"][0]["message"]["content"]
+                            return content
+                        except (KeyError, IndexError) as e:
+                            logger.error(f"Error extracting content from DeepSeek API response: {e}")
+                            return "Sorry, there was an error processing the response."
+                            
+        except Exception as e:
+            logger.error(f"Error in LLM request with direct messages: {str(e)}")
+            return "Sorry, an error occurred while processing your request."
+    
+    # Otherwise, use legacy method with user_message
+    if user_message:
+        # Use mock response if API key is not set or if explicitly configured to use mock
+        if USE_MOCK_RESPONSE or 1:
+            logger.info("Using mock LLM response")
+            return await mock_llm_response(user_message, user_data, session_id, db_session)
+        
+        # Otherwise use DeepSeek API
+        logger.info("Using DeepSeek API for response")
+        return await deepseek_chat_completion(user_message, user_data, session_id, db_session)
+    
+    # If no message content, return error
+    return "No message content provided." 

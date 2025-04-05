@@ -397,25 +397,25 @@
                     </button>
                 </div>
                 <div class="emotions-container">
-                    <div class="emotion-icon" data-mood="喜">
-                        <span title="喜">😄</span>
-                        <span class="emotion-label">喜</span>
+                    <div class="emotion-icon" data-mood="happy">
+                        <span title="开心">😊</span>
+                        <span class="emotion-label">开心</span>
                     </div>
-                    <div class="emotion-icon" data-mood="怒">
-                        <span title="怒">😠</span>
-                        <span class="emotion-label">怒</span>
+                    <div class="emotion-icon" data-mood="excited">
+                        <span title="兴奋">🤗</span>
+                        <span class="emotion-label">兴奋</span>
                     </div>
-                    <div class="emotion-icon" data-mood="哀">
-                        <span title="哀">😢</span>
-                        <span class="emotion-label">哀</span>
+                    <div class="emotion-icon" data-mood="calm">
+                        <span title="平静">😌</span>
+                        <span class="emotion-label">平静</span>
                     </div>
-                    <div class="emotion-icon" data-mood="思">
-                        <span title="思">🤔</span>
-                        <span class="emotion-label">思</span>
+                    <div class="emotion-icon" data-mood="sad">
+                        <span title="悲伤">😢</span>
+                        <span class="emotion-label">悲伤</span>
                     </div>
-                    <div class="emotion-icon" data-mood="乐">
-                        <span title="乐">😊</span>
-                        <span class="emotion-label">乐</span>
+                    <div class="emotion-icon" data-mood="angry">
+                        <span title="生气">😠</span>
+                        <span class="emotion-label">生气</span>
                     </div>
                 </div>
             </div>
@@ -523,10 +523,12 @@
             highContrast = !highContrast;
             if (highContrast) {
                 root.setAttribute('data-theme', 'high-contrast');
+                document.body.classList.add('high-contrast');
                 contrastToggle.textContent = '关闭';
                 contrastToggle.classList.add('active');
             } else {
                 root.removeAttribute('data-theme');
+                document.body.classList.remove('high-contrast');
                 contrastToggle.textContent = '开启';
                 contrastToggle.classList.remove('active');
             }
@@ -552,6 +554,7 @@
             if (savedHighContrast === 'true') {
                 highContrast = true;
                 root.setAttribute('data-theme', 'high-contrast');
+                document.body.classList.add('high-contrast');
                 contrastToggle.textContent = '关闭';
                 contrastToggle.classList.add('active');
             }
@@ -562,9 +565,26 @@
         
         // 添加情绪图标点击事件
         document.querySelectorAll('.emotion-icon').forEach(icon => {
-            icon.addEventListener('click', function() {
+            icon.addEventListener('click', function(e) {
+                // 阻止事件冒泡，确保不触发卡片的点击事件
+                e.stopPropagation();
+                
                 const mood = this.getAttribute('data-mood');
+                console.log(`Redirecting to diary with mood: ${mood}`);
                 window.location.href = `/diary?mood=${mood}`;
+            });
+            
+            // 为图标内的所有元素添加点击事件
+            icon.querySelectorAll('span').forEach(span => {
+                span.addEventListener('click', function(e) {
+                    // 阻止事件冒泡
+                    e.stopPropagation();
+                    
+                    // 获取父元素的mood属性
+                    const mood = this.parentElement.getAttribute('data-mood');
+                    console.log(`Span clicked: Redirecting to diary with mood: ${mood}`);
+                    window.location.href = `/diary?mood=${mood}`;
+                });
             });
         });
     </script>

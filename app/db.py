@@ -8,6 +8,7 @@ import os
 import logging
 import datetime
 import json
+import uuid
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, create_engine, delete
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -15,23 +16,32 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.future import select
 from sqlalchemy.sql import func
-import uuid
+
+# Import configuration
+from config import get_db_url, get_db_config, CONFIG, DATA_DIR
 
 # Configure logging
 logger = logging.getLogger(__name__)
+logger.setLevel(getattr(logging, CONFIG["log_level"]))
 
-# Get application directory
-app_dir = os.path.dirname(os.path.abspath(__file__))
-data_folder = os.path.join(app_dir, 'data')
+# Get database configuration
+db_config = get_db_config()
+DATABASE_URL = get_db_url()
 
-# Create data directory if it doesn't exist
-os.makedirs(data_folder, exist_ok=True)
+# Create async engine with configuration options
+engine_kwargs = {
+    "echo": db_config.get("echo", False)
+}
 
-# Database URL
-DATABASE_URL = f"sqlite+aiosqlite:///{os.path.join(data_folder, 'timecapsule.db')}"
+# Add pooling configuration for non-SQLite databases
+if not "sqlite" in db_config["driver"]:
+    if db_config.get("pool_size"):
+        engine_kwargs["pool_size"] = db_config["pool_size"]
+    if db_config.get("max_overflow"):
+        engine_kwargs["max_overflow"] = db_config["max_overflow"]
 
 # Create async engine
-engine = create_async_engine(DATABASE_URL, echo=False)
+engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
 # Create base class for declarative models
 Base = declarative_base()
@@ -69,7 +79,12 @@ class User(Base):
         profile_data = {}
         if self.profile_data:
             try:
-                profile_data = json.loads(self.profile_data)
+                # Handle the case where profile_data might be empty string or invalid JSON
+                if isinstance(self.profile_data, str) and self.profile_data.strip():
+                    profile_data = json.loads(self.profile_data)
+                    # Ensure profile_data is a dictionary, not None or another type
+                    if not isinstance(profile_data, dict):
+                        profile_data = {}
             except json.JSONDecodeError:
                 profile_data = {}
         
@@ -114,6 +129,36 @@ class DiaryEntry(Base):
             "date": self.date,
             "mood": self.mood,
             "pinned": self.pinned,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class DiaryEntrySummary(Base):
+    """Summary model for diary entries on a specific date."""
+    
+    __tablename__ = "diary_entry_summaries"
+    
+    id = Column(Integer, primary_key=True)
+    summary_uuid = Column(String(36), unique=True, nullable=False, index=True)
+    user_uuid = Column(String(36), ForeignKey("users.uuid", ondelete="CASCADE"), nullable=False)
+    date = Column(String(10), nullable=False, index=True)  # YYYY-MM-DD
+    summary = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+    
+    def __repr__(self):
+        return f"<DiaryEntrySummary(id={self.id}, date='{self.date}')>"
+    
+    def to_dict(self):
+        """Convert DiaryEntrySummary object to dictionary."""
+        return {
+            "id": self.summary_uuid,
+            "date": self.date,
+            "summary": self.summary,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
@@ -221,6 +266,7 @@ async def init_db():
         logger.info(f"Initializing database at {DATABASE_URL}")
         
         # Check if data directory exists and is writable
+        data_folder = CONFIG["data_folder"]
         if not os.path.exists(data_folder):
             logger.info(f"Creating data directory: {data_folder}")
             os.makedirs(data_folder, exist_ok=True)
@@ -241,12 +287,13 @@ async def init_db():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         
-        # Verify the database was created
-        db_path = os.path.join(data_folder, 'timecapsule.db')
-        if os.path.exists(db_path):
-            logger.info(f"Database file created successfully: {db_path} (Size: {os.path.getsize(db_path)} bytes)")
-        else:
-            logger.warning(f"Database file not found after initialization: {db_path}")
+        # Verify the database was created (for SQLite only)
+        if "sqlite" in db_config["driver"]:
+            db_path = os.path.join(db_config["path"], db_config["name"])
+            if os.path.exists(db_path):
+                logger.info(f"Database file created successfully: {db_path} (Size: {os.path.getsize(db_path)} bytes)")
+            else:
+                logger.warning(f"Database file not found after initialization: {db_path}")
         
         # Test database connection with a simple query
         logger.info("Testing database connection...")
@@ -361,6 +408,16 @@ class DiaryDB:
         return result.scalars().all()
     
     @staticmethod
+    async def get_entries_by_date(session, user_uuid, date):
+        """Get all diary entries for a user on a specific date."""
+        stmt = select(DiaryEntry).where(
+            DiaryEntry.user_uuid == user_uuid,
+            DiaryEntry.date == date
+        ).order_by(DiaryEntry.created_at.asc())
+        result = await session.execute(stmt)
+        return result.scalars().all()
+    
+    @staticmethod
     async def get_entry_by_uuid(session, entry_uuid):
         """Get a diary entry by UUID."""
         stmt = select(DiaryEntry).where(DiaryEntry.entry_uuid == entry_uuid)
@@ -421,6 +478,43 @@ class DiaryDB:
         await session.execute(query)
         await session.commit()
         return True
+    
+    @staticmethod
+    async def get_summary_by_date(session, user_uuid, date):
+        """Get a diary summary for a specific date."""
+        stmt = select(DiaryEntrySummary).where(
+            DiaryEntrySummary.user_uuid == user_uuid,
+            DiaryEntrySummary.date == date
+        )
+        result = await session.execute(stmt)
+        return result.scalars().first()
+    
+    @staticmethod
+    async def create_or_update_summary(session, user_uuid, date, summary_text):
+        """Create or update a diary summary for a specific date."""
+        # Check if summary exists
+        existing_summary = await DiaryDB.get_summary_by_date(session, user_uuid, date)
+        
+        if existing_summary:
+            # Update existing summary
+            existing_summary.summary = summary_text
+            existing_summary.updated_at = datetime.datetime.utcnow()
+            await session.commit()
+            await session.refresh(existing_summary)
+            return existing_summary
+        else:
+            # Create new summary
+            summary = DiaryEntrySummary(
+                summary_uuid=str(uuid.uuid4()),
+                user_uuid=user_uuid,
+                date=date,
+                summary=summary_text,
+                created_at=datetime.datetime.utcnow()
+            )
+            session.add(summary)
+            await session.commit()
+            await session.refresh(summary)
+            return summary
 
 
 class ChatDB:

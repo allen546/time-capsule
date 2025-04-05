@@ -36,39 +36,12 @@ async def get_cached_chat(chat_id):
     chat_logger.debug(f"Chat {chat_id} not in cache, fetching from database")
     return None  # Return None and let the caller fetch from the database
 
-def clear_chat_cache(chat_id=None):
-    """Clear the chat cache for a specific chat or all chats"""
-    if chat_id:
-        if chat_id in _chat_cache:
-            del _chat_cache[chat_id]
-        if chat_id in _cache_expiry:
-            del _cache_expiry[chat_id]
-        chat_logger.debug(f"Cache cleared for chat {chat_id}")
-    else:
-        _chat_cache.clear()
-        _cache_expiry.clear()
-        chat_logger.debug("All chat cache cleared")
-
-@chat_bp.route('/chats', methods=['GET'])
-async def get_chats(request):
-    request_id = getattr(request.ctx, 'request_id', str(uuid.uuid4())[:8])
-    chat_logger.info(f"[API:{request_id}] GET /api/chat/chats request received")
-    
-    try:
-        user_uuid = request.args.get('user_uuid')
-        chat_logger.debug(f"[API:{request_id}] User UUID from args: {user_uuid}")
-        
-        if not user_uuid:
-            chat_logger.warning(f"[API:{request_id}] Missing user_uuid parameter in GET /api/chat/chats request")
-            return json({'error': 'User UUID is required'}, status=400)
-        
-        async with async_session() as session:
-            chats = await ChatDB.get_sessions_by_user(session, user_uuid)
-            chat_logger.info(f"[API:{request_id}] Found {len(chats)} chats for user {user_uuid[:8] if user_uuid else 'unknown'}")
-            return json({'chats': [chat.to_dict() for chat in chats]})
-    except Exception as e:
-        chat_logger.error(f"[API:{request_id}] Error in GET /api/chat/chats: {str(e)}", exc_info=True)
-        return json({'error': str(e)}, status=500)
+def clear_chat_cache(chat_id):
+    """Clear the cache for a specific chat"""
+    if chat_id in _chat_cache:
+        del _chat_cache[chat_id]
+    if chat_id in _cache_expiry:
+        del _cache_expiry[chat_id]
 
 @chat_bp.route('/<chat_id>', methods=['GET'])
 async def get_chat(request, chat_id):
@@ -117,116 +90,6 @@ async def get_chat(request, chat_id):
             })
     except Exception as e:
         chat_logger.error(f"[API:{request_id}] Error in GET /api/chat/{chat_id}: {str(e)}", exc_info=True)
-        return json({'error': str(e)}, status=500)
-
-@chat_bp.route('', methods=['POST', 'GET', 'HEAD'])
-async def create_message(request):
-    """
-    API endpoint to create a new message.
-    
-    For GET: Returns user chat sessions (backward compatibility)
-    For POST: Creates a new message and returns the AI response
-    """
-    request_id = str(uuid.uuid4())[:8]
-    
-    # Handle GET requests (backward compatibility)
-    if request.method == 'GET' or request.method == 'HEAD':
-        chat_logger.info(f"[API:{request_id}] GET /api/chat request received (backward compatibility)")
-        
-        # Extract user_uuid from query parameters or header
-        user_uuid = request.args.get('user_uuid') or request.headers.get('X-User-UUID')
-        
-        # If no user_uuid is provided, return a temporary UUID and empty list
-        # instead of returning a 400 error for better compatibility
-        if not user_uuid:
-            chat_logger.warning(f"[API:{request_id}] No user_uuid provided in GET request, returning empty response with temporary UUID")
-            user_uuid = f"temp-{str(uuid.uuid4())}"
-            return json({"sessions": [], "user_uuid": user_uuid})
-        
-        # Get chat sessions for this user
-        try:
-            async with async_session() as session:
-                sessions = await ChatDB.get_sessions_by_user(session, user_uuid)
-                return json([session.to_dict() for session in sessions])
-        except Exception as e:
-            chat_logger.error(f"[API:{request_id}] Error fetching chat sessions: {str(e)}")
-            return json({"error": str(e)}, status=500)
-    
-    # Handle POST requests (creating a new message)
-    chat_logger.info(f"[API:{request_id}] POST /api/chat request received")
-    
-    # Log headers for debugging
-    headers = dict(request.headers)
-    sanitized_headers = {k: v for k, v in headers.items() 
-                      if not any(s in k.lower() for s in ['auth', 'key', 'token', 'secret'])}
-    chat_logger.debug(f"[API:{request_id}] Request headers: {sanitized_headers}")
-    
-    try:
-        # Parse the request data
-        data = request.json
-        chat_logger.debug(f"[API:{request_id}] Request body: {data}")
-        
-        # Extract message and user data
-        message = data.get('message')
-        chat_id = data.get('chat_id')
-        user_uuid = data.get('user_uuid')
-        
-        # Log validation of required fields
-        chat_logger.debug(f"[API:{request_id}] Validating request parameters - message: {bool(message)}, user_uuid: {bool(user_uuid)}")
-        
-        if not all([message, user_uuid]):
-            missing_fields = []
-            if not message:
-                missing_fields.append('message')
-            if not user_uuid:
-                missing_fields.append('user_uuid')
-                
-            error_msg = f"Missing required fields: {', '.join(missing_fields)}"
-            chat_logger.warning(f"[API:{request_id}] {error_msg}. Request data: {data}")
-            return json({'error': error_msg}, status=400)
-        
-        # Log message details
-        chat_logger.info(f"[API:{request_id}] Processing message from user {user_uuid[:8] if user_uuid else 'unknown'} for chat {chat_id or 'new chat'}")
-        chat_logger.debug(f"[API:{request_id}] Message content: '{message[:50]}...' ({len(message)} chars)")
-        
-        async with async_session() as session:
-            # Create new chat if chat_id is not provided
-            if not chat_id:
-                chat_id = str(uuid.uuid4())
-                chat_logger.info(f"[API:{request_id}] Creating new chat session with ID {chat_id}")
-                await ChatDB.create_session(session, user_uuid, chat_id)
-            else:
-                chat_logger.info(f"[API:{request_id}] Using existing chat session {chat_id}")
-                
-            # Create user message
-            message_id = str(uuid.uuid4())
-            chat_logger.debug(f"[API:{request_id}] Adding user message {message_id}")
-            await ChatDB.add_message(session, chat_id, message_id, message, is_user=True)
-        
-            # Get user data for personalization
-            user = await UserDB.get_user_by_uuid(session, user_uuid)
-            user_data = user.to_dict() if user else None
-            
-            # Generate AI response using the LLM integration
-            chat_logger.info(f"[API:{request_id}] Generating AI response with LLM integration")
-            ai_response = await llm_response(message, user_data, chat_id, session)
-            
-            # Create AI message
-            ai_message_id = str(uuid.uuid4())
-            chat_logger.debug(f"[API:{request_id}] Adding AI message {ai_message_id}")
-            await ChatDB.add_message(session, chat_id, ai_message_id, ai_response, is_user=False)
-            
-            # Clear cache for this chat
-            clear_chat_cache(chat_id)
-            chat_logger.debug(f"[API:{request_id}] Cleared cache for chat {chat_id}")
-            
-            chat_logger.info(f"[API:{request_id}] Successfully processed message and generated response")
-            return json({
-                'chat_id': chat_id,
-                'response': ai_response
-            })
-    except Exception as e:
-        chat_logger.error(f"[API:{request_id}] Error in POST /api/chat: {str(e)}", exc_info=True)
         return json({'error': str(e)}, status=500)
 
 @chat_bp.route('/<chat_id>', methods=['DELETE'])
@@ -404,6 +267,54 @@ async def add_chat_message(request, session_id):
             # Get user data for personalization
             user = await UserDB.get_user_by_uuid(session, user_uuid)
             user_data = user.to_dict() if user else None
+            
+            # Enhanced debugging - full dump of user data to diagnose profile issues
+            chat_logger.warning(f"==== USER DATA DUMP ==== [API:{request_id}] User {user_uuid[:8]}")
+            chat_logger.warning(f"USER OBJECT: {user}")
+            chat_logger.warning(f"USER DATA DICT: {user_data}")
+            
+            # Check if user profile is complete
+            if user_data is None:
+                # Log the fact that we're redirecting due to missing user data
+                chat_logger.warning(f"!!!! NO USER DATA REDIRECT !!!! [API:{request_id}] User {user_uuid[:8]}")
+                
+                return json({
+                    'status': 'redirect',
+                    'message': '请先创建您的个人资料，以便我们能为您提供个性化服务。',
+                    'redirect_url': '/profile'
+                })
+            else:
+                # Check if name is missing or if profile_data is empty
+                has_name = bool(user_data.get('name'))
+                profile_data_is_dict = isinstance(user_data.get('profile_data'), dict)
+                profile_data_has_entries = len(user_data.get('profile_data', {})) > 0 if profile_data_is_dict else False
+                
+                profile_complete = has_name and profile_data_is_dict and profile_data_has_entries
+                
+                # Add distinctive log message that will be easy to search for
+                chat_logger.warning(f"!!!! PROFILE CHECK !!!! [API:{request_id}] User {user_uuid[:8]} - " +
+                               f"has_name={has_name}, " +
+                               f"profile_data_is_dict={profile_data_is_dict}, " + 
+                               f"profile_data_has_entries={profile_data_has_entries}, " +
+                               f"profile_complete={profile_complete}")
+                
+                if not profile_complete:
+                    # Log detailed info about the profile
+                    chat_logger.warning(f"!!!! PROFILE INCOMPLETE !!!! [API:{request_id}] User {user_uuid[:8]} - " +
+                                   f"name='{user_data.get('name')}', " +
+                                   f"profile_data_type={type(user_data.get('profile_data')).__name__}, " +
+                                   f"profile_data={user_data.get('profile_data')}")
+                    
+                    # Log the fact that we're redirecting
+                    chat_logger.warning(f"!!!! REDIRECTING TO PROFILE !!!! [API:{request_id}] User {user_uuid[:8]}")
+                    
+                    return json({
+                        'status': 'redirect',
+                        'message': '请先完善您的个人资料，以便我更好地为您提供服务。',
+                        'redirect_url': '/profile'
+                    })
+                else:
+                    chat_logger.warning(f"!!!! PROFILE COMPLETE !!!! [API:{request_id}] User {user_uuid[:8]} - Proceeding with response")
             
             # Generate AI response
             chat_logger.info(f"[API:{request_id}] Generating AI response")
