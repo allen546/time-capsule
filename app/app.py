@@ -86,7 +86,7 @@ def configure_logging():
     contacts_logger = logging.getLogger('contacts')
     contacts_logger.setLevel(logging.WARNING)  # Only log warnings and errors
     
-    # Get the application logger
+    # Get the application logger，，
     app_logger = logging.getLogger(__name__)
     
     # Log configuration completed
