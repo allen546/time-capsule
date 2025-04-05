@@ -512,22 +512,36 @@ class DiaryDB:
         return result.scalars().first()
     
     @staticmethod
-    async def create_or_update_summary(session, user_uuid, date, summary_text):
-        """Create or update a diary summary for a specific date."""
+    async def create_or_update_summary(session, user_uuid, date, summary_text, summary_uuid=None):
+        """Create or update a diary summary for a specific date.
+        
+        Args:
+            session: The database session
+            user_uuid: The user's UUID
+            date: The date in YYYY-MM-DD format
+            summary_text: The summary text
+            summary_uuid: Optional UUID for the summary, used when restoring an existing summary
+            
+        Returns:
+            The created or updated DiaryEntrySummary
+        """
         # Check if summary exists
         existing_summary = await DiaryDB.get_summary_by_date(session, user_uuid, date)
         
         if existing_summary:
-            # Update existing summary
-            existing_summary.summary = summary_text
-            existing_summary.updated_at = datetime.datetime.utcnow()
-            await session.commit()
-            await session.refresh(existing_summary)
+            # If summary content has changed, directly update the created_at timestamp
+            # to reflect when the current summary was generated
+            if existing_summary.summary != summary_text:
+                existing_summary.summary = summary_text
+                existing_summary.created_at = datetime.datetime.utcnow()
+                existing_summary.updated_at = datetime.datetime.utcnow()
+                await session.commit()
+                await session.refresh(existing_summary)
             return existing_summary
         else:
             # Create new summary
             summary = DiaryEntrySummary(
-                summary_uuid=str(uuid.uuid4()),
+                summary_uuid=summary_uuid or str(uuid.uuid4()),
                 user_uuid=user_uuid,
                 date=date,
                 summary=summary_text,

@@ -697,14 +697,14 @@ async def get_diary_entries(request):
 @app.route('/api/diary/entries', methods=['POST'])
 async def create_diary_entry(request):
     """Create a new diary entry."""
-    # Get user UUID from header
+        # Get user UUID from header
     user_uuid = request.headers.get('X-User-UUID')
     diary_logger = logging.getLogger('diary')
     
     if not user_uuid:
         diary_logger.warning(f"POST /api/diary/entries 400 user: missing_uuid")
         return json_response({"status": "error", "message": "Missing user UUID"}, status=400)
-    
+        
     try:
         # Get diary entry data
         try:
@@ -1021,10 +1021,10 @@ async def intro(request):
         logger.error(f"Error serving intro page: {str(e)}")
         return html("<h1>Error loading page</h1><p>Please try again later.</p>")
 
-@app.route('/api/diary/summary/<date>')
+@app.route('/api/diary/summary/<date>', methods=['GET', 'PUT'])
 async def get_diary_summary(request, date):
     """
-    Get the summary of diary entries for a specific date.
+    Get or update the summary of diary entries for a specific date.
     
     Args:
         request: The request object
@@ -1041,7 +1041,7 @@ async def get_diary_summary(request, date):
     
     # Validate user UUID
     if not user_uuid:
-        diary_logger.warning(f"GET /api/diary/summary/{date} 400 user: missing_uuid")
+        diary_logger.warning(f"{request.method} /api/diary/summary/{date} 400 user: missing_uuid")
         return json_response({
             "status": "error",
             "message": "Missing user UUID in header",
@@ -1053,43 +1053,91 @@ async def get_diary_summary(request, date):
         # Validate date format (YYYY-MM-DD)
         datetime.datetime.strptime(date, '%Y-%m-%d')
     except ValueError:
-        diary_logger.warning(f"GET /api/diary/summary/{date} 400 user: {user_uuid}")
+        diary_logger.warning(f"{request.method} /api/diary/summary/{date} 400 user: {user_uuid}")
         return json_response({
             "status": "error",
             "message": "Invalid date format. Use YYYY-MM-DD",
             "error_code": "INVALID_DATE_FORMAT"
         }, status=400)
     
-    try:
-        diary_logger.info(f"Retrieving summary for user: {user_uuid}, date: {date}")
-        async with async_session() as session:
-            # Get summary for the date
-            summary = await DiaryDB.get_summary_by_date(session, user_uuid, date)
-            
-            if not summary:
-                diary_logger.info(f"GET /api/diary/summary/{date} 404 user: {user_uuid}")
+    # Handle GET request
+    if request.method == 'GET':
+        try:
+            diary_logger.info(f"Retrieving summary for user: {user_uuid}, date: {date}")
+            async with async_session() as session:
+                # Get summary for the date
+                summary = await DiaryDB.get_summary_by_date(session, user_uuid, date)
+                
+                if not summary:
+                    diary_logger.info(f"GET /api/diary/summary/{date} 404 user: {user_uuid}")
+                    return json_response({
+                        "status": "error",
+                        "message": f"No summary found for date {date}",
+                        "error_code": "NO_SUMMARY_FOUND"
+                    }, status=404)
+                
+                # Log success
+                diary_logger.info(f"GET /api/diary/summary/{date} 200 user: {user_uuid}")
+                
+                # Return summary
                 return json_response({
-                    "status": "error",
-                    "message": f"No summary found for date {date}",
-                    "error_code": "NO_SUMMARY_FOUND"
-                }, status=404)
-            
-            # Log success
-            diary_logger.info(f"GET /api/diary/summary/{date} 200 user: {user_uuid}")
-            
-            # Return summary
+                    "status": "success",
+                    "data": summary.to_dict()
+                })
+                
+        except Exception as e:
+            diary_logger.error(f"GET /api/diary/summary/{date} 500 user: {user_uuid} - {str(e)}")
             return json_response({
-                "status": "success",
-                "data": summary.to_dict()
-            })
+                "status": "error",
+                "message": "An error occurred while retrieving the diary summary",
+                "error_code": "RETRIEVAL_ERROR"
+            }, status=500)
+    
+    # Handle PUT request (restoring or updating a summary)
+    elif request.method == 'PUT':
+        try:
+            # Get data from request
+            try:
+                data = request.json
+            except Exception:
+                diary_logger.warning(f"PUT /api/diary/summary/{date} 400 user: {user_uuid} - Invalid JSON")
+                return json_response({"status": "error", "message": "Invalid JSON"}, status=400)
             
-    except Exception as e:
-        diary_logger.error(f"GET /api/diary/summary/{date} 500 user: {user_uuid} - {str(e)}")
-        return json_response({
-            "status": "error",
-            "message": "An error occurred while retrieving the diary summary",
-            "error_code": "RETRIEVAL_ERROR"
-        }, status=500)
+            if not data or 'summary_text' not in data:
+                diary_logger.warning(f"PUT /api/diary/summary/{date} 400 user: {user_uuid} - Missing summary_text")
+                return json_response({
+                    "status": "error", 
+                    "message": "Missing required field: summary_text"
+                }, status=400)
+            
+            summary_text = data.get('summary_text')
+            summary_uuid = data.get('summary_uuid')  # Optional, might be None for new summaries
+            
+            async with async_session() as session:
+                # Update or create summary in database
+                summary = await DiaryDB.create_or_update_summary(
+                    session, 
+                    user_uuid, 
+                    date, 
+                    summary_text,
+                    summary_uuid
+                )
+                
+                diary_logger.info(f"PUT /api/diary/summary/{date} 200 user: {user_uuid} - Summary updated/restored")
+                
+                return json_response({
+                    "status": "success",
+                    "message": "Summary updated successfully",
+                    "data": summary.to_dict()
+                })
+                
+        except Exception as e:
+            diary_logger.error(f"PUT /api/diary/summary/{date} 500 user: {user_uuid} - {str(e)}")
+            return json_response({
+                "status": "error",
+                "message": f"An error occurred while updating the diary summary: {str(e)}",
+                "error_code": "UPDATE_ERROR"
+            }, status=500)
 
 @app.route('/api/diary/summarize/<date>')
 async def summarize_diary_entries(request, date):

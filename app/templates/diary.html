@@ -985,15 +985,15 @@
                 <button class="modal-btn secondary" id="modalSecondary" style="display: none;">取消</button>
             </div>
         </div>
-            </div>
-            
+    </div>
+    
     <div class="container diary-container">
         <div class="sidebar" id="diary-sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-title">日记列表</div>
                 <button class="sidebar-action" id="new-entry-btn">
                     <i class="fas fa-plus"></i>新建
-            </button>
+                </button>
             </div>
             <div id="entries-container">
                 <!-- Date groups will be generated here -->
@@ -1372,8 +1372,11 @@
                 sortedDates.forEach((date, index) => {
                     const entries = entriesByDate[date];
                     
-                    // Format the date for display
-                    const displayDate = new Date(date).toLocaleDateString('zh-CN', {
+                    // Format the date for display using Shanghai timezone
+                    const displayDate = new Date(date);
+                    // Add timezone offset for Asia/Shanghai (UTC+8)
+                    displayDate.setHours(displayDate.getHours() + 8);
+                    const formattedDate = displayDate.toLocaleDateString('zh-CN', {
                         year: 'numeric',
                         month: '2-digit',
                         day: '2-digit',
@@ -1393,7 +1396,7 @@
                     dateHeader.innerHTML = `
                         <div class="date-label">
                             <i class="fas fa-calendar-day"></i>
-                            ${displayDate}
+                            ${formattedDate}
                             <span class="date-count">${entries.length}</span>
                         </div>
                         <div class="date-actions">
@@ -1427,9 +1430,9 @@
                         };
                         const moodEmoji = moodEmojis[entry.mood] || '📝';
                         
-                        // Format time
+                        // Format time in Asia/Shanghai timezone
                         const entryTime = entry.created_at ? 
-                            new Date(entry.created_at).toLocaleTimeString('zh-CN', {
+                            formatShanghaiTime(entry.created_at, {
                                 hour: '2-digit',
                                 minute: '2-digit'
                             }) : '';
@@ -1494,7 +1497,7 @@
                             <div class="empty-sidebar-icon">⚠️</div>
                             <div>加载失败</div>
                             <div>无法加载日记列表，请稍后再试</div>
-                    </div>
+                        </div>
                 `;
                 }
             }
@@ -1506,6 +1509,8 @@
             
             // Update date display
             const entryDate = new Date(entry.date);
+            // Add timezone offset for Asia/Shanghai (UTC+8)
+            entryDate.setHours(entryDate.getHours() + 8);
             document.getElementById('today-date').textContent = entryDate.toLocaleDateString('zh-CN', {
                 year: 'numeric',
                 month: '2-digit',
@@ -1704,8 +1709,11 @@
                 loadingDiv.style.alignItems = 'center';
                 loadingDiv.style.gap = '10px';
                 
-                // Format date for display
-                const displayDate = new Date(date).toLocaleDateString('zh-CN', {
+                // Format date for display in Asia/Shanghai timezone
+                const displayDate = new Date(date);
+                // Add timezone offset for Asia/Shanghai (UTC+8)
+                displayDate.setHours(displayDate.getHours() + 8);
+                const formattedDate = displayDate.toLocaleDateString('zh-CN', {
                     year: 'numeric',
                     month: '2-digit',
                     day: '2-digit',
@@ -1714,9 +1722,23 @@
                 
                 loadingDiv.innerHTML = `
                     <div style="font-size: 24px;"><i class="fas fa-spinner fa-spin"></i></div>
-                    <div>正在获取 ${displayDate} 的日记总结...</div>
+                    <div>正在获取 ${formattedDate} 的日记总结...</div>
                 `;
                 document.body.appendChild(loadingDiv);
+                
+                // Get all entries for this date to check against summary timestamp
+                const entriesResponse = await fetch('/api/diary/entries', {
+                    headers: {
+                        'X-User-UUID': localStorage.getItem('userUUID')
+                    }
+                });
+                
+                if (!entriesResponse.ok) {
+                    throw new Error(`获取日记条目失败: ${entriesResponse.status}`);
+                }
+                
+                const entriesData = await entriesResponse.json();
+                const entriesForDate = entriesData.data.filter(entry => entry.date.split('T')[0] === date);
                 
                 // Get the summary
                 const response = await fetch(`/api/diary/summary/${date}`, {
@@ -1735,6 +1757,15 @@
                 }
                 
                 const data = await response.json();
+                const summaryData = data.data;
+                
+                // Check if there are new entries since the summary was generated
+                const summaryTimestamp = toShanghaiTime(summaryData.created_at || summaryData.updated_at);
+                const hasNewEntries = entriesForDate.some(entry => {
+                    const entryTimestamp = toShanghaiTime(entry.created_at);
+                    const entryUpdatedTimestamp = entry.updated_at ? toShanghaiTime(entry.updated_at) : new Date(0);
+                    return entryTimestamp > summaryTimestamp || entryUpdatedTimestamp > summaryTimestamp;
+                });
                 
                 // Create a modal to display the summary
                 const modalOverlay = document.createElement('div');
@@ -1759,16 +1790,43 @@
                 modalContent.style.maxHeight = '80vh';
                 modalContent.style.overflow = 'auto';
                 
+                // Add timestamp to the modal in Asia/Shanghai format
+                const summaryGeneratedTime = formatShanghaiTime(summaryData.created_at, {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                // Button HTML depends on whether there are new entries
+                const regenerateButtonHTML = hasNewEntries 
+                    ? `<button id="regenerate-summary" style="background-color: #4CAF50; color: white; border: none; border-radius: 8px; padding: 8px 16px; margin-right: 10px; cursor: pointer;">重新生成</button>` 
+                    : '';
+                
                 modalContent.innerHTML = `
-                    <h2 style="margin-bottom: 15px; color: var(--primary-color);">${displayDate} 的日记总结</h2>
-                    <div style="line-height: 1.6; margin-bottom: 20px;">${data.data.summary}</div>
+                    <h2 style="margin-bottom: 15px; color: var(--primary-color);">${formattedDate} 的日记总结</h2>
+                    <div style="line-height: 1.6; margin-bottom: 20px;">${summaryData.summary}</div>
+                    <div style="font-size: 15px; color: var(--text-secondary); margin-bottom: 20px;">
+                        总结生成于: ${summaryGeneratedTime}
+                        ${hasNewEntries ? '<div style="color: #4CAF50; margin-top: 5px;"><i class="fas fa-info-circle"></i> 总结生成后有新的日记条目</div>' : ''}
+                    </div>
                     <div style="text-align: right;">
+                        ${regenerateButtonHTML}
                         <button id="close-summary" style="background-color: var(--primary-color); color: white; border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer;">关闭</button>
                     </div>
                 `;
-                
+                    
                 modalOverlay.appendChild(modalContent);
                 document.body.appendChild(modalOverlay);
+                
+                // Add event listener for regenerate button if it exists
+                if (hasNewEntries) {
+                    document.getElementById('regenerate-summary').addEventListener('click', () => {
+                        document.body.removeChild(modalOverlay);
+                        summarizeDate(date, entriesForDate);
+                    });
+                }
                 
                 document.getElementById('close-summary').addEventListener('click', () => {
                     document.body.removeChild(modalOverlay);
@@ -1788,10 +1846,13 @@
             }
         }
 
-        // Function to summarize entries for a specific date - updated with Chinese prompts
+        // Function to summarize entries for a specific date
         async function summarizeDate(date, entries) {
-            // Format date for display
-            const displayDate = new Date(date).toLocaleDateString('zh-CN', {
+            // Format date for display in Asia/Shanghai timezone
+            const displayDate = new Date(date);
+            // Add timezone offset for Asia/Shanghai (UTC+8)
+            displayDate.setHours(displayDate.getHours() + 8);
+            const formattedDate = displayDate.toLocaleDateString('zh-CN', {
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
@@ -1800,12 +1861,31 @@
             
             // Check if there are entries to summarize
             if (!entries || entries.length === 0) {
-                showModal('提示', `没有找到 ${displayDate} 的日记条目可以总结`);
+                showModal('提示', `没有找到 ${formattedDate} 的日记条目可以总结`);
                 return;
             }
             
+            // Get existing summary before attempting to generate a new one
+            let existingSummary = null;
+            try {
+                const existingResponse = await fetch(`/api/diary/summary/${date}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-UUID': localStorage.getItem('userUUID')
+                    }
+                });
+                
+                if (existingResponse.ok) {
+                    const existingData = await existingResponse.json();
+                    existingSummary = existingData.data;
+                }
+            } catch (error) {
+                console.log('No existing summary found or error fetching it:', error);
+            }
+            
             // Confirm with user
-            showConfirmModal('确认', `要生成 ${displayDate} 的日记总结吗？AI将分析您这一天的所有日记内容，提炼关键点和情感，生成一份总结。`, async () => {
+            showConfirmModal('确认', `要生成 ${formattedDate} 的日记总结吗？AI将分析您这一天的所有日记内容，提炼关键点和情感，生成一份总结。`, async () => {
                 try {
                     // Show loading state
                     const loadingDiv = document.createElement('div');
@@ -1824,8 +1904,8 @@
                     loadingDiv.style.gap = '10px';
                     loadingDiv.innerHTML = `
                         <div style="font-size: 24px;"><i class="fas fa-spinner fa-spin"></i></div>
-                        <div>正在生成 ${displayDate} 的日记总结...</div>
-                        <div style="font-size: 12px; margin-top: 5px;">这可能需要几秒钟时间</div>
+                        <div>正在生成 ${formattedDate} 的日记总结...</div>
+                        <div style="font-size: 15px; margin-top: 5px;">这可能需要几秒钟时间</div>
                     `;
                     document.body.appendChild(loadingDiv);
                     
@@ -1847,7 +1927,8 @@
                     
                     const data = await response.json();
                     
-                    if (data.data && data.data.summary) {
+                    // Validate the summary to ensure it's not empty or nonsensical
+                    if (data.data && data.data.summary && isValidSummary(data.data.summary)) {
                         // After successful summarization, update the button to "View Summary"
                         const dateGroup = document.querySelector(`.date-group[data-date="${date}"]`);
                         if (dateGroup) {
@@ -1857,7 +1938,6 @@
                                 viewSummaryBtn.className = 'date-view-summary';
                                 viewSummaryBtn.dataset.date = date;
                                 viewSummaryBtn.title = '查看这一天的日记总结';
-                                viewSummaryBtn.innerHTML = '<i class="fas fa-book-open"></i>查看总结';
                                 viewSummaryBtn.innerHTML = '查看总结';
                                 
                                 viewSummaryBtn.addEventListener('click', (e) => {
@@ -1893,7 +1973,7 @@
                         modalContent.style.overflow = 'auto';
                         
                         modalContent.innerHTML = `
-                            <h2 style="margin-bottom: 15px; color: var(--primary-color);">${displayDate} 的日记总结</h2>
+                            <h2 style="margin-bottom: 15px; color: var(--primary-color);">${formattedDate} 的日记总结</h2>
                             <div style="line-height: 1.6; margin-bottom: 20px;">${data.data.summary}</div>
                             <div style="text-align: right;">
                                 <button id="close-summary" style="background-color: var(--primary-color); color: white; border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer;">关闭</button>
@@ -1917,7 +1997,27 @@
                         document.addEventListener('keydown', escHandler);
                         
                     } else {
-                        showModal('错误', '生成总结失败，请稍后再试');
+                        // If the summary is invalid, show an error and don't update the button
+                        if (existingSummary) {
+                            // Restore existing summary in the backend
+                            try {
+                                await fetch(`/api/diary/summary/${date}`, {
+                                    method: 'PUT',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-User-UUID': localStorage.getItem('userUUID')
+                                    },
+                                    body: JSON.stringify({ 
+                                        summary_text: existingSummary.summary,
+                                        summary_uuid: existingSummary.summary_uuid 
+                                    })
+                                });
+                            } catch (restoreError) {
+                                console.error('Error restoring original summary:', restoreError);
+                            }
+                        }
+                        
+                        showModal('错误', '生成的总结无效或为空，原有总结已保留。请稍后再试。');
                     }
                     
                 } catch (error) {
@@ -1925,6 +2025,32 @@
                     showModal('错误', `生成总结时发生错误: ${error.message}`);
                 }
             });
+        }
+
+        // Function to validate summary
+        function isValidSummary(summary) {
+            if (!summary || typeof summary !== 'string') {
+                return false;
+            }
+            
+            // Check if summary is empty or too short
+            if (summary.trim().length < 10) {
+                return false;
+            }
+            
+            // Check for error messages that might be in the summary
+            const errorKeywords = [
+                'error', 'exception', '错误', '异常', 'failed', '失败',
+                'invalid', '无效', 'not found', '未找到'
+            ];
+            
+            for (const keyword of errorKeywords) {
+                if (summary.toLowerCase().includes(keyword)) {
+                    return false;
+                }
+            }
+            
+            return true;
         }
 
         // Initialize diary page
@@ -2034,6 +2160,21 @@
         function closeModal() {
             const modal = document.getElementById('customModal');
             modal.classList.remove('active');
+        }
+
+        // Function to convert UTC time to Asia/Shanghai time (UTC+8)
+        function toShanghaiTime(utcDateString) {
+            if (!utcDateString) return '';
+            const date = new Date(utcDateString);
+            // Add 8 hours for Shanghai time zone (UTC+8)
+            date.setHours(date.getHours() + 8);
+            return date;
+        }
+        
+        // Format time with Shanghai timezone
+        function formatShanghaiTime(utcDateString, options = {}) {
+            const shanghaiDate = toShanghaiTime(utcDateString);
+            return shanghaiDate.toLocaleString('zh-CN', options);
         }
     </script>
 </body>
